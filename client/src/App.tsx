@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+/*import { useState, useEffect } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
@@ -41,6 +41,72 @@ function App() {
         Click on the Vite and React logos to learn more
       </p>
     </>
+  )
+}
+
+export default App
+import CoachDashboardView from './modules/CoachDashboardView'
+
+function App() {
+  return <CoachDashboardView />
+}
+export default App
+
+
+
+import PlayerProfileView from './modules/PlayerProfileView'
+
+function App() {
+  return <PlayerProfileView />
+}
+export default App
+
+import SignUpView from './modules/SignUpView'
+
+function App() {
+  return <SignUpView />
+}
+export default App
+
+
+
+import LoginView from './modules/LoginView'
+
+function App() {
+  return <LoginView />
+}
+export default App
+*/
+
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import SignUpView from './modules/SignUpView'
+import LoginView from './modules/LoginView'
+import PlayerProfileView from './modules/PlayerProfileView'
+import CoachDashboardView from './modules/CoachDashboardView'
+import GeneralView from './modules/GeneralView'
+import RegistrationView from './modules/RegistrationView'
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Default → Sign Up */}
+        <Route path="/" element={<SignUpView />} />
+
+        {/* Auth pages */}
+        <Route path="/login" element={<LoginView />} />
+        <Route path="/signup" element={<SignUpView />} />
+
+        {/* Dashboard pages */}
+        <Route path="/player" element={<PlayerProfileView />} />
+        <Route path="/coach" element={<CoachDashboardView />} />
+        <Route path="/general" element={<GeneralView />} />
+        <Route path="/registrations" element={<RegistrationView />} />
+
+        {/* Catch-all fallback */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
