@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+// Define the User schema with discriminator key to support inheritance for Player and Coach
 const options = {
     discriminatorKey: 'role',
     timestamps: true,

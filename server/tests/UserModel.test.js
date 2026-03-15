@@ -1,17 +1,24 @@
-// will need to wait for mongoDB set up before we tes
 const mongoose = require("mongoose")
 const User = require("../models/User")
 
 describe("User Model Test", () => {
 
+  // Connect to MongoDB before running tests
   beforeAll(async () => {
     await mongoose.connect("mongodb://localhost:27017")
   })
 
+  // Close connection after tests
   afterAll(async () => {
     await mongoose.connection.close()
   })
 
+  // Clear the database before each test
+  beforeEach(async () => {
+    await User.deleteMany({})
+  })
+
+  // Test case for creating a user successfully
   test("should create & save user successfully", async () => {
     const validUser = new User({
       username: "testuser",
@@ -24,6 +31,7 @@ describe("User Model Test", () => {
     expect(savedUser.email).toBe("test@email.com")
   })
 
+  // Test case for missing required fields
   test("should fail if required fields missing", async () => {
     const invalidUser = new User({ username: "testuser" })
     let err
