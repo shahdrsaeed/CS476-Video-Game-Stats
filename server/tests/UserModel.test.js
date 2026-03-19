@@ -5,7 +5,7 @@ describe("User Model Test", () => {
 
   // Connect to MongoDB before running tests
   beforeAll(async () => {
-    await mongoose.connect("mongodb://localhost:27017")
+    await mongoose.connect("mongodb://localhost:27017/user-test");
   })
 
   // Close connection after tests

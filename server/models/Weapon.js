@@ -1,4 +1,3 @@
-// Import Mongoose library
 const mongoose = require('mongoose');
 
 // Define the Weapon model in MongoDB

@@ -1,14 +1,12 @@
-// Import Mongoose library
 const mongoose = require("mongoose")
 
-// Import Agent model
 const Agent = require("../models/Agent")
 
 describe("Agent Model Test", () => {
 
   // Connect to MongoDB before running tests
   beforeAll(async () => {
-    await mongoose.connect("mongodb://localhost:27017")
+    await mongoose.connect("mongodb://localhost:27017/agent-test");
   })
 
   // Close connection after tests

@@ -8,7 +8,7 @@ describe("Weapon Model Test", () => {
 
   // Connect to MongoDB before running tests
   beforeAll(async () => {
-    await mongoose.connect("mongodb://localhost:27017")
+    await mongoose.connect("mongodb://localhost:27017/weapon-test");
   })
 
   // Close connection after tests
@@ -19,6 +19,7 @@ describe("Weapon Model Test", () => {
   // Clear the database before each test
   beforeEach(async () => {
     await Weapon.deleteMany({})
+    await Weapon.syncIndexes();
   })
 
   // Test that a valid weapon saves successfully
