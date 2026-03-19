@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-
 const User = require('./User');
 
 // Define the Coach model in MongoDB
@@ -10,8 +9,9 @@ const CoachSchema = new mongoose.Schema({
         required: true, 
     }
 
-    // Additional fields specific to Coach can be added here if needed
 });
 
 // Create the Coach model as a discriminator of User
 const Coach = User.discriminator('Coach', CoachSchema);
+
+module.exports = Coach;
