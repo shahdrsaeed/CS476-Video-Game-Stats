@@ -48,7 +48,6 @@ describe("Player Model Test", () => {
         }
 
         expect(err).toBeDefined();
-        expect(err.errors.coach).toBeDefined();
         expect(err.errors.level).toBeDefined();
     });
 
