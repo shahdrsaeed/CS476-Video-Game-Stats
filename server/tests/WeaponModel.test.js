@@ -2,7 +2,7 @@
 const mongoose = require("mongoose")
 
 // Import Weapon model
-const Weapon = require("../models/Weapon")
+const Weapon = require("../models/submodel/Weapon")
 
 describe("Weapon Model Test", () => {
 
