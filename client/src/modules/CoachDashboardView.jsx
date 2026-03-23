@@ -243,7 +243,7 @@ const CoachDashboardView = () => {
     <div style={styles.page}>
 
       {/* ── HEADER ── */}
-      <Navbar role="coach" />
+      <Navbar  />
 
       <div style={styles.body}>
 

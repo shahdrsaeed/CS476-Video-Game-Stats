@@ -11,6 +11,7 @@ const LoginView = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    localStorage.setItem('userRole', role); 
     // TODO: connect to backend API — for now route based on role
     if (role === 'coach') navigate('/coach');
     else navigate('/player');

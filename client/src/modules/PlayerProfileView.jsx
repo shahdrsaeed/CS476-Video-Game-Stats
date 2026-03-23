@@ -24,7 +24,7 @@ const PlayerProfileView = () => {
   return (
     <div style={styles.page}>
       {/* ── HEADER ── */}
-      <Navbar role="player" />
+      <Navbar  />
 
       <div style={styles.body}>
 
