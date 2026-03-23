@@ -12,7 +12,7 @@ const PlayerSchema = new mongoose.Schema({
   coach: { // required reference to a coach
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Coach',
-    required: true,
+    default: null,
     index: true
   },
 
@@ -50,6 +50,7 @@ const PlayerSchema = new mongoose.Schema({
 
     firstBloods: { type: Number, default: 0, min: 0 },
     aces: { type: Number, default: 0, min: 0 },
+    flawlessRounds: { type: Number, default: 0, min: 0 },
 
     headshotPercentage: { type: Number, default: 0, min: 0, max: 100 },
     bodyshotPercentage: { type: Number, default: 0, min: 0, max: 100 },
@@ -127,12 +128,23 @@ PlayerSchema.virtual('kdRatio').get(function () {
     : (this.stats.kills / this.stats.deaths).toFixed(2);
 });
 
+// (K+A)/D ratio
+PlayerSchema.virtual('kadRatio').get(function () {
+  const { kills, assists, deaths } = this.stats;
+
+  if (deaths === 0) return (kills + assists).toFixed(2);
+
+  return ((kills + assists) / deaths).toFixed(2);
+});
+
 // Win rate percentage
 PlayerSchema.virtual('winRate').get(function () {
   const total = this.stats.wins + this.stats.losses;
   if (total === 0) return 0;
   return ((this.stats.wins / total) * 100).toFixed(2);
 });
+
+// TODO: ADD VIRTUALS FOR ROUND WIN %, KAST, DD delta / round, Round win %
 
 
 //  Method to add a match to last20Matches

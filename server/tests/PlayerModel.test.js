@@ -92,6 +92,22 @@ describe("Player Model Test", () => {
         expect(player.matchesPlayed).toBe(15);
     });
 
+    test("should correctly calculate winRate virtual", async () => {
+        const player = new Player({
+            username: "TestPlayer",
+            email: "test@example.com",
+            password: "securepassword",
+            coach: new mongoose.Types.ObjectId(),
+            rank: "Platinum I",
+            level: 40,
+            stats: {
+                wins: 8,
+                losses: 12
+            }
+        });
+        expect(player.winRate).toBe("40.00");
+    });
+
     // Virtual: test kdRatio calculation (kills/deaths)
     test("should correctly calculate kdRatio", async () => {
         const player = new Player({
@@ -109,6 +125,24 @@ describe("Player Model Test", () => {
 
         expect(player.kdRatio).toBe("2.00");
     });
+
+    test("should calculate kadRatio correctly", async () => {
+        const player = new Player({
+            username: "TestPlayer",
+            email: "test@example.com",
+            password: "securepassword",
+            coach: new mongoose.Types.ObjectId(),
+            rank: "Diamond I",
+            level: 50,
+            stats: {
+                kills: 30,
+                assists: 10,
+                deaths: 10
+            }
+        });
+        expect(player.kadRatio).toBe("4.00");
+    });
+
 
     // Method: addMatch limit
     test("should only keep last 20 matches", async () => {
