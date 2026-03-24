@@ -1,0 +1,15 @@
+# This file tells Git which files and directories to ignore when pushing changes into the shared repository (Server Side)
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
