@@ -1,0 +1,18 @@
+# This file tells Git which files and directories to ignore when pushing changes into the shared repository (Root/Main)
+
+# Dependencies
+node_modules/
+
+# Lock files
+package-lock.json
+
+# Environment variables
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
