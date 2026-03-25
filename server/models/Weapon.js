@@ -2,18 +2,33 @@ const mongoose = require('mongoose');
 
 // Define the Weapon model in MongoDB
 const WeaponSchema = new mongoose.Schema({
-  weaponName: {
+  name: {
     type: String,
     required: true, // every weapon must have a name
     unique: true    // no two weapons can share the same name
   },
-  weaponType: {     // Ex. sidearm, SMG, shotgun, rifle 
+  type: {           // Ex. sidearm, SMG, shotgun, rifle 
     type: String,
     required: true  // every weapon must have a type
   },
   description: {
     type: String,
     required: true  // every weapon must have a description for the archive
+  },
+  fireMode: {       // Ex. automatic, semi-automatic, burst
+    type: String,
+  },
+  rateOfFire: {     // rounds per second
+    type: Number,
+    min: 0
+  },
+  magazineCapacity: { // number of rounds per magazine
+    type: Number,
+    min: 0
+  },
+  wallPenetration: { // how well the weapon penetrates surfaces
+    type: String,
+    enum: ['Low', 'Medium', 'High']
   },
   advantages: [     // is an array since each weapon can have multiple advantages
     { 
@@ -28,7 +43,7 @@ const WeaponSchema = new mongoose.Schema({
     }
   ],
   imageUrl: {
-    type: String    // optional - for displaying image of weapon in the archive
+    type: String    // for displaying image of weapon in the archive
   }
 });
 

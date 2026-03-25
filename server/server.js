@@ -1,8 +1,9 @@
 // Load environment variables from .env file for MongoDB connection
 require('dotenv').config();
 
+// Use Google's DNS to resolve MongoDB SRV records on Windows
 const dns = require('dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']); // Use Google's DNS to resolve MongoDB SRV records on Windows
+dns.setServers(['8.8.8.8', '8.8.4.4']); 
 
 const express = require('express');
 const app = express();

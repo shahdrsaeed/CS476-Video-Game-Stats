@@ -1,12 +1,22 @@
+// Load environment variables from .env file for MongoDB connection
+require('dotenv').config({ path: './.env' })
+
+// Use Google's DNS to resolve MongoDB SRV records on Windows
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']); 
+
+// Import Mongoose library
 const mongoose = require("mongoose")
+
+// Import User model
 const User = require("../models/User")
 
 describe("User Model Test", () => {
 
-  // Connect to MongoDB before running tests
-  beforeAll(async () => {
-    await mongoose.connect("mongodb://localhost:27017/user-test");
-  })
+  // Connect to MongoDB Atlas before running tests
+    beforeAll(async () => {
+    await mongoose.connect(process.env.MONGODB_URI  + "-test");
+  }, 10000)
 
   // Close connection after tests
   afterAll(async () => {
@@ -16,6 +26,7 @@ describe("User Model Test", () => {
   // Clear the database before each test
   beforeEach(async () => {
     await User.deleteMany({})
+    await User.syncIndexes()
   })
 
   // Test case for creating a user successfully
@@ -45,4 +56,29 @@ describe("User Model Test", () => {
     expect(err.errors.password).toBeDefined()
   })
 
+  // Test case for unique username and email
+  test("should fail if username or email is not unique", async () => {
+  const firstUser = new User({
+    username: "testuser",
+    email: "test@email.com",
+    password: "hashedpassword"
+  })
+  await firstUser.save()
+
+  const duplicateUser = new User({
+    username: "testuser", // duplicate username
+    email: "test@email.com", // duplicate email
+    password: "differentpassword"
+  })
+
+  let err
+  try {
+    await duplicateUser.save()
+  } catch (error) {
+    err = error
+  }
+
+  expect(err).toBeDefined()
+  expect(err.code).toBe(11000) // MongoDB duplicate key error
+  })
 })
