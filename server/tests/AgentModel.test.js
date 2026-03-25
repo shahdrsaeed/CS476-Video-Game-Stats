@@ -1,13 +1,22 @@
+// Load environment variables from .env file for MongoDB connection
+require('dotenv').config({ path: './.env' })
+
+// Use Google's DNS to resolve MongoDB SRV records on Windows
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']); 
+
+// Import Mongoose library
 const mongoose = require("mongoose")
 
+// Import Agent model
 const Agent = require("../models/submodel/Agent")
 
 describe("Agent Model Test", () => {
 
-  // Connect to MongoDB before running tests
+  // Connect to MongoDB Atlas before running tests
   beforeAll(async () => {
-    await mongoose.connect("mongodb://localhost:27017/agent-test");
-  })
+  await mongoose.connect(process.env.MONGODB_URI  + "-test");
+}, 10000)
 
   // Close connection after tests
   afterAll(async () => {
@@ -17,12 +26,13 @@ describe("Agent Model Test", () => {
   // Clear the database before each test
   beforeEach(async () => {
     await Agent.deleteMany({})
+    await Agent.syncIndexes()
   })
 
   // Test that a valid agent saves successfully
   test("should create & save agent successfully", async () => {
     const validAgent = new Agent({
-      agentName: "Phoenix",
+      name: "Phoenix",
       role: "Duelist",
       description: "Phoenix is an aggressive duelist who specializes in self-sustain and entry fragging. His kit revolves around fire-based abilities that can suppress enemies and heal himself.",
       advantages: 
@@ -53,14 +63,14 @@ describe("Agent Model Test", () => {
 
     // Verify the agent was saved with the correct values
     expect(savedAgent._id).toBeDefined()
-    expect(savedAgent.agentName).toBe("Phoenix")
+    expect(savedAgent.name).toBe("Phoenix")
     expect(savedAgent.role).toBe("Duelist")
     expect(savedAgent.abilities).toHaveLength(4)
   })
 
   // Test that required fields are enforced
   test("should fail if required fields are missing", async () => {
-    const invalidAgent = new Agent({ agentName: "Phoenix" }) // missing role and description
+    const invalidAgent = new Agent({ name: "Phoenix" }) // missing role and description
     let err
     try {
       await invalidAgent.save()
@@ -73,16 +83,16 @@ describe("Agent Model Test", () => {
   })
 
   // Test that two agents cannot share the same name
-  test("should fail if agentName is not unique", async () => {
+  test("should fail if name is not unique", async () => {
     const firstAgent = new Agent({
-      agentName: "Phoenix",
+      name: "Phoenix",
       role: "Duelist",
       description: "A fire-based duelist"
     })
     await firstAgent.save()
 
     const duplicateAgent = new Agent({
-      agentName: "Phoenix", // same name, should fail
+      name: "Phoenix", // same name, should fail
       role: "Controller",
       description: "A different agent"
     })

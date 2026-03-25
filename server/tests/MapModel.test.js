@@ -1,14 +1,23 @@
+// Load environment variables from .env file for MongoDB connection
+require('dotenv').config({ path: './.env' })
+
+// Use Google's DNS to resolve MongoDB SRV records on Windows
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']); 
+
+// Import Mongoose library
 const mongoose = require("mongoose")
 
-const Map = require("../models/Map");
+// Import Map model
+const Map = require("../models/submodel/Map");
 
 describe("Map Model Test", () => {
 
-    // Connect to a new mongoose server for test
+    // Connect to MongoDB Atlas before running tests
     beforeAll(async () => {
-        await mongoose.connect("mongodb://localhost:27017/map-test");
-    })
-
+       await mongoose.connect(process.env.MONGODB_URI  + "-test");
+    }, 10000)
+   
     // Close connection after tests
     afterAll(async () => {
         await mongoose.connection.close()
@@ -17,6 +26,7 @@ describe("Map Model Test", () => {
     // Clear database before each test
     beforeEach(async () => {
         await Map.deleteMany({})
+        await Map.syncIndexes();
     })
 
     // Test that a valid map saves successfully

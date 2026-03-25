@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 // Define the Agent model in MongoDB
 const AgentSchema = new mongoose.Schema({
-  agentName: {
+  name: {
     type: String,
     required: true, // every agent must have a name
     unique: true    // no two agents can share the same name
@@ -33,14 +33,14 @@ const AgentSchema = new mongoose.Schema({
       description: { type: String }     // description of what the ability does
     }
   ],
-  difficulty: {     // optional - used to describe how difficult the agent is to play/learn 
-    type: String    // Ex. easy, medium, hard
+  difficulty: {     // used to describe how difficult the agent is to play/learn 
+    type: String, 
+    enum: ['Easy', 'Medium', 'Hard']   
   },
-  imageUrl: {
-    type: String    // optional - for displaying image of agent in the archive
+  imageURL: {
+    type: String    // for displaying image of agent in the archive
   }
 });
 
 // Export model so that other files can use it
 module.exports = mongoose.model('Agent', AgentSchema);
-
