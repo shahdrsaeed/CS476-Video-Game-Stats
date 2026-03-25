@@ -52,9 +52,9 @@ const PlayerSchema = new mongoose.Schema({
     aces: { type: Number, default: 0, min: 0 },
     flawlessRounds: { type: Number, default: 0, min: 0 },
 
-    headshotPercentage: { type: Number, default: 0, min: 0, max: 100 },
-    bodyshotPercentage: { type: Number, default: 0, min: 0, max: 100 },
-    legshotPercentage: { type: Number, default: 0, min: 0, max: 100 }
+    headshots: { type: Number, default: 0, min: 0 },
+    bodyshots: { type: Number, default: 0, min: 0 },
+    legshots: { type: Number, default: 0, min: 0 }
   },
 
   topWeapons: [{ // top 3 weapons for the player with stats
@@ -142,6 +142,27 @@ PlayerSchema.virtual('winRate').get(function () {
   const total = this.stats.wins + this.stats.losses;
   if (total === 0) return 0;
   return ((this.stats.wins / total) * 100).toFixed(2);
+});
+
+// Headshot percentage
+PlayerSchema.virtual('headshotPercentage').get(function () {
+  const totalHits = this.stats.headshots + this.stats.bodyshots + this.stats.legshots;
+  if (totalHits === 0) return 0;
+  return ((this.stats.headshots / totalHits) * 100).toFixed(2);
+});
+
+// Bodyshot percentage
+PlayerSchema.virtual('bodyshotPercentage').get(function () {
+  const totalHits = this.stats.headshots + this.stats.bodyshots + this.stats.legshots;
+  if (totalHits === 0) return 0;
+  return ((this.stats.bodyshots / totalHits) * 100).toFixed(2);
+});
+
+// Legshot percentage
+PlayerSchema.virtual('legshotPercentage').get(function () {
+  const totalHits = this.stats.headshots + this.stats.bodyshots + this.stats.legshots;
+  if (totalHits === 0) return 0;
+  return ((this.stats.legshots / totalHits) * 100).toFixed(2);
 });
 
 // TODO: ADD VIRTUALS FOR ROUND WIN %, KAST, DD delta / round, Round win %

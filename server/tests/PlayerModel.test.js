@@ -91,6 +91,7 @@ describe("Player Model Test", () => {
         expect(player.matchesPlayed).toBe(15);
     });
 
+    // Virtual: test winRate calculation
     test("should correctly calculate winRate virtual", async () => {
         const player = new Player({
             username: "TestPlayer",
@@ -125,6 +126,7 @@ describe("Player Model Test", () => {
         expect(player.kdRatio).toBe("2.00");
     });
 
+    // Virtual: test kadRatio calculation ((kills + assists) / deaths)
     test("should calculate kadRatio correctly", async () => {
         const player = new Player({
             username: "TestPlayer",
@@ -140,6 +142,27 @@ describe("Player Model Test", () => {
             }
         });
         expect(player.kadRatio).toBe("4.00");
+    });
+
+    // Virtual: test headshotPercentage calculation
+    test("should calculate headshot, body, and legshot percentages correctly", async () => {
+        const player = new Player({
+            username: "TestPlayer",
+            email: "test@example.com",
+            password: "securepassword",
+            coach: new mongoose.Types.ObjectId(),
+            rank: "Immortal I",
+            level: 60,
+            stats: {
+                headshots: 25,
+                bodyshots: 50,
+                legshots: 25
+            }
+        });
+
+        expect(player.headshotPercentage).toBe("25.00");
+        expect(player.bodyshotPercentage).toBe("50.00");
+        expect(player.legshotPercentage).toBe("25.00");
     });
 
 
