@@ -1,19 +1,31 @@
+// Load environment variables from .env file for MongoDB connection
+require('dotenv').config({ path: './.env' })
+
+// Use Google's DNS to resolve MongoDB SRV records on Windows
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']); 
+
+// Import Mongoose library
 const mongoose = require("mongoose");
+
+// Import User and Player models
 const User = require("../models/User");
 const Player = require("../models/Player");
 
 describe("Player Model Test", () => {
 
+    // Connect to MongoDB Atlas before running tests
     beforeAll(async () => {
-        await mongoose.connect("mongodb://127.0.0.1:27017/player-test");
-    });
+       await mongoose.connect(process.env.MONGODB_URI  + "-test");
+    }, 10000)
 
     beforeEach(async () => {
-        await User.deleteMany({});
+        await User.deleteMany({})
+        await Player.deleteMany({})
+        await Player.syncIndexes();
     });
 
     afterAll(async () => {
-        await mongoose.connection.dropDatabase();
         await mongoose.connection.close();
     });
 
