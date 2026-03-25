@@ -1,3 +1,5 @@
+# This file tells Git which files and directories to ignore when pushing changes into the shared repository (Client Side)
+
 # Logs
 logs
 *.log

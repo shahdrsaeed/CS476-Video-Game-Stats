@@ -1,12 +1,22 @@
+// Load environment variables from .env file for MongoDB connection
+require('dotenv').config();
+
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']); // Use Google's DNS to resolve MongoDB SRV records on Windows
+
 const express = require('express');
 const app = express();
 const cors = require('cors');
+const connectDB = require('./config/db'); // Function used to call connectDB()
 const corsOptions = {
     origin: 'http://localhost:5173', // Adjust this to your frontend's URL
 };
 
-// test comment
+// Enable CORS for frontend requests
 app.use(cors(corsOptions));
+
+// Connect to MongoDB Atlas
+connectDB();
 
 app.get('/api', (req, res) => {
     res.json({"fruits": ["apple", "banana", "orange"]});
