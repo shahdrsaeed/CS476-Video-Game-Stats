@@ -34,6 +34,12 @@ const PlayerSchema = new mongoose.Schema({
     index: true
   },
 
+  rr: { // current rank rating (RR) of the player
+    type: Number,
+    required: true,
+    min: 0
+  },
+
   level: { // level of player account
     type: Number,
     required: true,

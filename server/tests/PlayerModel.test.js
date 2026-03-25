@@ -25,6 +25,7 @@ describe("Player Model Test", () => {
             password: "securepassword",
             coach: new mongoose.Types.ObjectId(),
             rank: "Gold II",
+            rr: 950,
             level: 30
         });
 
@@ -59,6 +60,7 @@ describe("Player Model Test", () => {
             password: "securepassword",
             coach: new mongoose.Types.ObjectId(),
             rank: "Super Duper", // invalid rank
+            rr: 500,
             level: 10
         });
 
@@ -99,6 +101,7 @@ describe("Player Model Test", () => {
             password: "securepassword",
             coach: new mongoose.Types.ObjectId(),
             rank: "Platinum I",
+            rr: 1200,
             level: 40,
             stats: {
                 wins: 8,
@@ -116,6 +119,7 @@ describe("Player Model Test", () => {
             password: "securepassword",
             coach: new mongoose.Types.ObjectId(),
             rank: "Silver I",
+            rr: 700,
             level: 15,
             stats: {
                 kills: 20,
@@ -134,6 +138,7 @@ describe("Player Model Test", () => {
             password: "securepassword",
             coach: new mongoose.Types.ObjectId(),
             rank: "Diamond I",
+            rr: 1500,
             level: 50,
             stats: {
                 kills: 30,
@@ -152,6 +157,7 @@ describe("Player Model Test", () => {
             password: "securepassword",
             coach: new mongoose.Types.ObjectId(),
             rank: "Immortal I",
+            rr: 1800,
             level: 60,
             stats: {
                 headshots: 25,
@@ -174,6 +180,7 @@ describe("Player Model Test", () => {
             password: "securepassword",
             coach: new mongoose.Types.ObjectId(),
             rank: "Gold I",
+            rr: 900,
             level: 25
         });
 
