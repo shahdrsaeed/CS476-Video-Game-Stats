@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { PLAYERS_LIST } from '../data/mockData';
-import { Search, Shield, User, ChevronRight, X } from 'lucide-react';
+import { Search, Shield, User, ChevronRight, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
 
 const rankColor = (rank) => {
   if (!rank) return '#888';
@@ -12,9 +12,42 @@ const rankColor = (rank) => {
   return '#888';
 };
 
+// ── Request button logic ──────────────────────────────────
+const getRequestStatus = (playerName, requests) => {
+  const found = requests.find(r => r.player === playerName);
+  if (!found) return 'none';
+  return found.status; // 'Pending' or 'Approved'
+};
+
 const TeamSearchView = () => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery]       = useState('');
   const [selected, setSelected] = useState(null);
+  const [requests, setRequests] = useState([]);
+
+  // Load requests from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('registrationRequests');
+    if (stored) setRequests(JSON.parse(stored));
+  }, []);
+
+  // Save to localStorage whenever requests change
+  useEffect(() => {
+    localStorage.setItem('registrationRequests', JSON.stringify(requests));
+  }, [requests]);
+
+  const handleRequest = (player) => {
+    const status = getRequestStatus(player.name, requests);
+    if (status !== 'none') return; // already requested
+
+    const newRequest = {
+      id: Date.now(),
+      player: player.name,
+      team: player.team,
+      date: new Date().toISOString().split('T')[0],
+      status: 'Pending',
+    };
+    setRequests(prev => [...prev, newRequest]);
+  };
 
   const filtered = PLAYERS_LIST.filter(p =>
     p.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -27,7 +60,6 @@ const TeamSearchView = () => {
       <Navbar />
 
       <div style={styles.body}>
-
         {/* Search bar */}
         <div style={styles.searchSection}>
           <h1 style={styles.title}>TEAM SEARCH</h1>
@@ -68,7 +100,6 @@ const TeamSearchView = () => {
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,70,85,0.4)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#1a1f2e'}
               >
-                {/* Avatar + name */}
                 <div style={styles.cardTop}>
                   <img src={player.avatar} alt={player.name} style={styles.cardAvatar} />
                   <div style={{ flex: 1 }}>
@@ -79,20 +110,16 @@ const TeamSearchView = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* Team badge */}
                 <div style={styles.teamBadge}>
                   <Shield size={11} color="#ff4655" style={{ marginRight: 5 }} />
                   {player.team}
                 </div>
-
-                {/* Key stats */}
                 <div style={styles.cardStats}>
                   {[
-                    { label: 'K/D', value: player.kdRatio },
+                    { label: 'K/D',  value: player.kdRatio },
                     { label: 'WIN%', value: player.winRate },
-                    { label: 'ACS', value: player.acs },
-                    { label: 'HS%', value: player.headshotPercent },
+                    { label: 'ACS',  value: player.acs },
+                    { label: 'HS%',  value: player.headshotPercent },
                   ].map(s => (
                     <div key={s.label} style={styles.statItem}>
                       <div style={styles.statLabel}>{s.label}</div>
@@ -100,7 +127,6 @@ const TeamSearchView = () => {
                     </div>
                   ))}
                 </div>
-
                 <button style={styles.viewBtn}>
                   VIEW PROFILE <ChevronRight size={12} style={{ marginLeft: 4 }} />
                 </button>
@@ -114,6 +140,8 @@ const TeamSearchView = () => {
       {selected && (
         <div style={modal.overlay} onClick={() => setSelected(null)}>
           <div style={modal.box} onClick={e => e.stopPropagation()}>
+
+            {/* Header with Request button */}
             <div style={modal.header}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <img src={selected.avatar} alt={selected.name} style={modal.avatar} />
@@ -125,21 +153,29 @@ const TeamSearchView = () => {
                   </div>
                 </div>
               </div>
-              <button style={modal.closeBtn} onClick={() => setSelected(null)}>
-                <X size={16} />
-              </button>
+
+              {/* ── REQUEST BUTTON (top right) ── */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <RequestButton
+                  status={getRequestStatus(selected.name, requests)}
+                  onClick={() => handleRequest(selected)}
+                />
+                <button style={modal.closeBtn} onClick={() => setSelected(null)}>
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
             {/* Stats grid */}
             <div style={modal.statsGrid}>
               {[
-                { label: 'K/D', value: selected.kdRatio },
-                { label: 'WIN RATE', value: selected.winRate },
-                { label: 'ACS', value: selected.acs },
-                { label: 'HS%', value: selected.headshotPercent },
-                { label: 'KAST', value: selected.kast },
+                { label: 'K/D',     value: selected.kdRatio },
+                { label: 'WIN RATE',value: selected.winRate },
+                { label: 'ACS',     value: selected.acs },
+                { label: 'HS%',     value: selected.headshotPercent },
+                { label: 'KAST',    value: selected.kast },
                 { label: 'DMG/RND', value: selected.damagePerRound },
-                { label: 'KILLS', value: selected.kills },
+                { label: 'KILLS',   value: selected.kills },
                 { label: 'MATCHES', value: selected.matches },
               ].map(s => (
                 <div key={s.label} style={modal.statBox}>
@@ -184,13 +220,63 @@ const TeamSearchView = () => {
   );
 };
 
+// ── Request Button Component ──────────────────────────────
+const RequestButton = ({ status, onClick }) => {
+  if (status === 'Approved') {
+    return (
+      <div style={{ ...reqBtn.base, ...reqBtn.approved }}>
+        <CheckCircle size={13} style={{ marginRight: 6 }} /> APPROVED
+      </div>
+    );
+  }
+  if (status === 'Pending') {
+    return (
+      <div style={{ ...reqBtn.base, ...reqBtn.pending }}>
+        <Clock size={13} style={{ marginRight: 6 }} /> PENDING
+      </div>
+    );
+  }
+  return (
+    <button style={{ ...reqBtn.base, ...reqBtn.request }} onClick={onClick}>
+      <UserPlus size={13} style={{ marginRight: 6 }} /> REQUEST
+    </button>
+  );
+};
+
+const reqBtn = {
+  base: {
+    display: 'inline-flex', alignItems: 'center',
+    borderRadius: 6, padding: '8px 14px',
+    fontSize: 12, fontWeight: 900, letterSpacing: 2,
+    fontFamily: "'Barlow Condensed', sans-serif",
+    cursor: 'default', border: 'none',
+  },
+  request: {
+    background: 'rgba(255,70,85,0.15)',
+    border: '1px solid rgba(255,70,85,0.35)',
+    color: '#ff4655',
+    cursor: 'pointer',
+  },
+  pending: {
+    background: 'rgba(245,158,11,0.1)',
+    border: '1px solid rgba(245,158,11,0.3)',
+    color: '#f59e0b',
+  },
+  approved: {
+    background: 'rgba(34,197,94,0.1)',
+    border: '1px solid rgba(34,197,94,0.3)',
+    color: '#22c55e',
+  },
+};
+
+// ── Styles ────────────────────────────────────────────────
 const styles = {
   page: { minHeight: '100vh', backgroundColor: '#0a0d14', fontFamily: "'Barlow Condensed', 'Arial Narrow', sans-serif", color: '#ccc' },
   body: { padding: '40px 40px' },
   searchSection: { maxWidth: 700, marginBottom: 36 },
   title: { fontSize: 32, fontWeight: 900, color: '#fff', letterSpacing: 4, margin: '0 0 6px 0' },
   subtitle: { fontSize: 13, color: '#444', letterSpacing: 1, marginBottom: 20 },
-  searchBar: { display: 'flex', alignItems: 'center', gap: 12, background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 8, padding: '14px 16px', transition: 'border-color 0.2s' },
+  searchBar: { display: 'flex', alignItems: 'center', gap: 12, background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 8, padding: '14px 16px' },
   searchInput: { flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontFamily: "'Barlow Condensed', 'Arial Narrow', sans-serif", fontSize: 15, letterSpacing: 1 },
   clearBtn: { background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', display: 'flex', padding: 0 },
   resultCount: { fontSize: 11, color: '#333', letterSpacing: 2, marginTop: 10 },
