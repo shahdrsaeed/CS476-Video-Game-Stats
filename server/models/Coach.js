@@ -3,12 +3,16 @@ const User = require('./User');
 
 // Define the Coach model in MongoDB
 const CoachSchema = new mongoose.Schema({
-    teamId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Team', // reference to the Team model
-        required: true, 
-    }
-
+    title: { // title of the coach (e.g. Head Coach, Assistant Coach)
+        type: String,
+        required: true,
+        default: 'Head Coach',
+        enum: ['Head Coach', 'Assistant Coach', 'Analyst', 'Manager']
+    },
+    company: { // optional company/organization the coach is affiliated with
+        type: String,
+        default: null
+    },
 });
 
 // Create the Coach model as a discriminator of User

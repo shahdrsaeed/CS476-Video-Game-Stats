@@ -1,7 +1,11 @@
 import axios from 'axios';
 
-export const registerUser = (data) => {
-  return axios.post('/api/users/register', data);
+export const createUser = (data) => {
+  return axios.post('/api/users/create', data, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
 };
 
 export const loginUser = (data) => {

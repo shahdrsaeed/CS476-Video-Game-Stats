@@ -14,10 +14,10 @@ const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
-      const res = await loginUser(form);
+      const res = await loginUser(form); // Call the API to log in
 
       const user = res.data.user;
-      
+
       localStorage.setItem('user', JSON.stringify(user));
 
       if (user.role === 'Coach') {

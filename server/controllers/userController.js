@@ -3,8 +3,8 @@ const Player = require('../models/Player');
 const Coach = require('../models/Coach');
 const bcrypt = require('bcrypt'); 
 
-// REGISTER (Player or Coach)
-exports.register = async (req, res) => {
+// Create (Player or Coach)
+exports.create = async (req, res) => {
   try {
     const { username, email, password, role, ...rest } = req.body;
 
