@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, User, Mail, Lock, Users, Upload, ChevronRight } from 'lucide-react';
+import { createUser } from '../services/UserApi';
 
 const SignUpView = () => {
   const navigate = useNavigate();
-  const [role, setRole] = useState('player');
+  const [role, setRole] = useState('Player');
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [form, setForm] = useState({ username: '', email: '', password: '', teamName: '' });
   const fileInputRef = useRef();
@@ -16,12 +17,31 @@ const SignUpView = () => {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // TODO: connect to backend API
-    console.log('Signing up:', { role, ...form });
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  try {
+    const data = {
+      username: form.username,
+      email: form.email,
+      password: form.password,
+      role: role, 
+      teamName: form.teamName,
+      imageURL: " " // TODO: placeholder since image upload isn't implemented yet
+    };
+
+    await createUser(data);
+
     navigate('/login');
-  };
+
+  } catch (err) {
+    console.error('FULL ERROR:', err);
+    console.error('RESPONSE DATA:', err.response?.data);
+    console.error('STATUS:', err.response?.status);
+
+    alert(err.response?.data?.message || 'An error occurred during sign up.');
+  }
+};
 
   return (
     <div style={styles.page}>
@@ -37,10 +57,10 @@ const SignUpView = () => {
 
         {/* Role Toggle */}
         <div style={styles.toggleWrapper}>
-          <button style={{ ...styles.toggleBtn, ...(role === 'player' ? styles.toggleActive : {}) }} onClick={() => setRole('player')} type="button">
+          <button style={{ ...styles.toggleBtn, ...(role === 'Player' ? styles.toggleActive : {}) }} onClick={() => setRole('Player')} type="button">
             <User size={13} style={{ marginRight: 5 }} /> PLAYER
           </button>
-          <button style={{ ...styles.toggleBtn, ...(role === 'coach' ? styles.toggleActive : {}) }} onClick={() => setRole('coach')} type="button">
+          <button style={{ ...styles.toggleBtn, ...(role === 'Coach' ? styles.toggleActive : {}) }} onClick={() => setRole('Coach')} type="button">
             <Shield size={13} style={{ marginRight: 5 }} /> COACH
           </button>
         </div>
@@ -58,10 +78,10 @@ const SignUpView = () => {
             <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
           </div>
 
-          <Field label={role === 'player' ? 'VALORANT ID' : 'USERNAME'} name="username" value={form.username} onChange={handleChange} placeholder={role === 'player' ? 'e.g. Aspas#NA1' : 'Coach username'} icon={<User size={14} color="#555" />} />
+          <Field label={role === 'Player' ? 'VALORANT ID' : 'USERNAME'} name="username" value={form.username} onChange={handleChange} placeholder={role === 'Player' ? 'e.g. Aspas#NA1' : 'Coach username'} icon={<User size={14} color="#555" />} />
           <Field label="EMAIL" name="email" type="email" value={form.email} onChange={handleChange} placeholder="your@email.com" icon={<Mail size={14} color="#555" />} />
           <Field label="PASSWORD" name="password" type="password" value={form.password} onChange={handleChange} placeholder="Min. 8 characters" icon={<Lock size={14} color="#555" />} />
-          <Field label="TEAM NAME" name="teamName" value={form.teamName} onChange={handleChange} placeholder={role === 'player' ? 'Team to join' : 'Team you coach'} icon={<Users size={14} color="#555" />} />
+          <Field label="TEAM NAME" name="teamName" value={form.teamName} onChange={handleChange} placeholder={role === 'Player' ? 'Team to join' : 'Team you coach'} icon={<Users size={14} color="#555" />} />
 
           <div style={styles.roleTag}>
             <Shield size={13} color="#ff4655" />

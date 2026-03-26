@@ -2,13 +2,6 @@ const mongoose = require('mongoose');
 const User = require('./User');
 
 const PlayerSchema = new mongoose.Schema({
-  team: { // optional team reference for players not currently on a team
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Team',
-    default: null,
-    index: true
-  },
-
   coach: { // required reference to a coach
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Coach',
@@ -19,6 +12,7 @@ const PlayerSchema = new mongoose.Schema({
   rank: { // rank of the player
     type: String,
     required: true,
+    default: 'Unranked',
     enum: [
       'Unranked',
       'Iron I', 'Iron II', 'Iron III',
@@ -36,12 +30,14 @@ const PlayerSchema = new mongoose.Schema({
 
   rr: { // current rank rating (RR) of the player
     type: Number,
+    default: 0,
     required: true,
     min: 0
   },
 
   level: { // level of player account
     type: Number,
+    default: 1,
     required: true,
     min: 0
   },
@@ -50,6 +46,8 @@ const PlayerSchema = new mongoose.Schema({
     kills: { type: Number, default: 0, min: 0 },
     deaths: { type: Number, default: 0, min: 0 },
     assists: { type: Number, default: 0, min: 0 },
+
+    acs: { type: Number, default: 0, min: 0 },
 
     wins: { type: Number, default: 0, min: 0 },
     losses: { type: Number, default: 0, min: 0 },

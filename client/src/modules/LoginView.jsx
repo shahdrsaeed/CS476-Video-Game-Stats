@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Mail, Lock, ChevronRight, User, Users } from 'lucide-react';
+import { loginUser } from '../services/UserApi';
 
 const LoginView = () => {
   const navigate = useNavigate();
@@ -9,12 +10,25 @@ const LoginView = () => {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
-    localStorage.setItem('userRole', role); 
-    // TODO: connect to backend API — for now route based on role
-    if (role === 'coach') navigate('/coach');
-    else navigate('/player');
+
+    try {
+      const res = await loginUser(form); // Call the API to log in
+
+      const user = res.data.user;
+
+      localStorage.setItem('user', JSON.stringify(user));
+
+      if (user.role === 'Coach') {
+        navigate('/coach');
+      } else {
+        navigate('/player');
+      }
+
+    } catch (err) {
+      alert(err.response?.data?.error || 'Login failed');
+    }
   };
 
   return (

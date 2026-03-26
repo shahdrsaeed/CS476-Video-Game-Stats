@@ -20,6 +20,18 @@ const UserSchema = new mongoose.Schema({
     password: {
         type: String,
         required: true,
+    },
+    // ADD imageURL
+    imageURL:{
+        type: String,
+        required: true,
+    },
+    // team reference for coaches to link them to their team (optional for players)
+    teamId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Team',
+        default: null,
+        index: true
     }
 }, options)
 
