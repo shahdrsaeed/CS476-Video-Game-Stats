@@ -1,38 +1,57 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Mail, Lock, ChevronRight, User, Users } from 'lucide-react';
+import { Shield, Mail, Lock, ChevronRight, User, Users, AlertCircle } from 'lucide-react';
 import { loginUser } from '../services/UserApi';
+
+// ── Shake keyframe injected once ──
+const shakeStyle = `
+@keyframes shake {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(-8px); }
+  30%  { transform: translateX(8px); }
+  45%  { transform: translateX(-6px); }
+  60%  { transform: translateX(6px); }
+  75%  { transform: translateX(-3px); }
+  90%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+.shake { animation: shake 0.5s ease; }
+`;
 
 const LoginView = () => {
   const navigate = useNavigate();
   const [role, setRole] = useState('player');
   const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [shaking, setShaking] = useState(false);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-const handleSubmit = async (e) => {
+  const triggerShake = (msg) => {
+    setError(msg);
+    setShaking(true);
+    setTimeout(() => setShaking(false), 500);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
+    setError('');
     try {
-      const res = await loginUser(form); // Call the API to log in
-
+      const res = await loginUser(form);
       const user = res.data.user;
-
       localStorage.setItem('user', JSON.stringify(user));
-
-      if (user.role === 'Coach') {
-        navigate('/coach');
-      } else {
-        navigate('/player');
-      }
-
+      localStorage.setItem('userRole', user.role === 'Coach' ? 'coach' : 'player');
+      if (user.role === 'Coach') navigate('/coach');
+      else navigate('/player');
     } catch (err) {
-      alert(err.response?.data?.error || 'Login failed');
+      triggerShake(err.response?.data?.error || 'Login failed. Please check your credentials.');
     }
   };
 
   return (
     <div style={styles.page}>
+      <style>{shakeStyle}</style>
+
       <div style={styles.leftPanel}>
         <div style={styles.logoRow}>
           <div style={styles.logoIcon}><Shield size={18} color="#ff4655" /></div>
@@ -60,7 +79,16 @@ const handleSubmit = async (e) => {
             <span style={{ marginLeft: 8, color: '#555', fontSize: 11, letterSpacing: 1 }}>SIGNING IN AS</span>
             <span style={{ marginLeft: 6, color: '#ff4655', fontWeight: 900, fontSize: 11, letterSpacing: 2 }}>{role.toUpperCase()}</span>
           </div>
-          <button type="submit" style={styles.submitBtn}>
+
+          {/* ── Inline error message ── */}
+          {error && (
+            <div style={styles.errorBox}>
+              <AlertCircle size={13} color="#ff4655" style={{ flexShrink: 0 }} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <button type="submit" className={shaking ? 'shake' : ''} style={styles.submitBtn}>
             SIGN IN <ChevronRight size={16} style={{ marginLeft: 6 }} />
           </button>
         </form>
@@ -118,6 +146,7 @@ const styles = {
   forgotRow: { display: 'flex', justifyContent: 'flex-end', marginTop: -6 },
   forgotLink: { fontSize: 11, color: '#ff4655', cursor: 'pointer', letterSpacing: 1 },
   roleTag: { display: 'flex', alignItems: 'center', background: 'rgba(255,70,85,0.05)', border: '1px solid rgba(255,70,85,0.12)', borderRadius: 6, padding: '9px 12px' },
+  errorBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,70,85,0.08)', border: '1px solid rgba(255,70,85,0.3)', borderRadius: 6, padding: '10px 12px', fontSize: 12, color: '#ff4655', letterSpacing: 1 },
   submitBtn: { background: '#ff4655', border: 'none', borderRadius: 6, padding: '13px 0', color: '#fff', fontFamily: "'Barlow Condensed', 'Arial Narrow', sans-serif", fontWeight: 900, fontSize: 14, letterSpacing: 3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   divider: { display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' },
   dividerLine: { flex: 1, height: 1, background: '#1e2535' },

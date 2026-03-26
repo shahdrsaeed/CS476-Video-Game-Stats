@@ -1,13 +1,29 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, User, Mail, Lock, Users, Upload, ChevronRight } from 'lucide-react';
+import { Shield, User, Mail, Lock, Users, Upload, ChevronRight, AlertCircle } from 'lucide-react';
 import { createUser } from '../services/UserApi';
+
+const shakeStyle = `
+@keyframes shake {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(-8px); }
+  30%  { transform: translateX(8px); }
+  45%  { transform: translateX(-6px); }
+  60%  { transform: translateX(6px); }
+  75%  { transform: translateX(-3px); }
+  90%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+.shake { animation: shake 0.5s ease; }
+`;
 
 const SignUpView = () => {
   const navigate = useNavigate();
   const [role, setRole] = useState('Player');
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [form, setForm] = useState({ username: '', email: '', password: '', teamName: '' });
+  const [error, setError] = useState('');
+  const [shaking, setShaking] = useState(false);
   const fileInputRef = useRef();
 
   const handleAvatarChange = (e) => {
@@ -17,35 +33,35 @@ const SignUpView = () => {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const triggerShake = (msg) => {
+    setError(msg);
+    setShaking(true);
+    setTimeout(() => setShaking(false), 500);
+  };
 
-  try {
-    const data = {
-      username: form.username,
-      email: form.email,
-      password: form.password,
-      role: role, 
-      teamName: form.teamName,
-      imageURL: " " // TODO: placeholder since image upload isn't implemented yet
-    };
-
-    await createUser(data);
-
-    navigate('/login');
-
-  } catch (err) {
-    console.error('FULL ERROR:', err);
-    console.error('RESPONSE DATA:', err.response?.data);
-    console.error('STATUS:', err.response?.status);
-
-    alert(err.response?.data?.message || 'An error occurred during sign up.');
-  }
-};
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const data = {
+        username: form.username,
+        email: form.email,
+        password: form.password,
+        role: role,
+        teamName: form.teamName,
+        imageURL: ' ',
+      };
+      await createUser(data);
+      navigate('/login');
+    } catch (err) {
+      triggerShake(err.response?.data?.message || 'An error occurred during sign up.');
+    }
+  };
 
   return (
     <div style={styles.page}>
-      {/* LEFT PANEL */}
+      <style>{shakeStyle}</style>
+
       <div style={styles.leftPanel}>
         <div style={styles.logoRow}>
           <div style={styles.logoIcon}><Shield size={18} color="#ff4655" /></div>
@@ -55,7 +71,6 @@ const handleSubmit = async (e) => {
         <h1 style={styles.title}>CREATE ACCOUNT</h1>
         <p style={styles.subtitle}>Join the competitive network</p>
 
-        {/* Role Toggle */}
         <div style={styles.toggleWrapper}>
           <button style={{ ...styles.toggleBtn, ...(role === 'Player' ? styles.toggleActive : {}) }} onClick={() => setRole('Player')} type="button">
             <User size={13} style={{ marginRight: 5 }} /> PLAYER
@@ -66,7 +81,6 @@ const handleSubmit = async (e) => {
         </div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Avatar */}
           <div style={styles.avatarRow}>
             <div style={styles.avatarCircle} onClick={() => fileInputRef.current.click()}>
               {avatarPreview ? <img src={avatarPreview} alt="avatar" style={styles.avatarImg} /> : <Upload size={20} color="#ff4655" />}
@@ -89,7 +103,15 @@ const handleSubmit = async (e) => {
             <span style={{ marginLeft: 6, color: '#ff4655', fontWeight: 900, fontSize: 11, letterSpacing: 2 }}>{role.toUpperCase()}</span>
           </div>
 
-          <button type="submit" style={styles.submitBtn}>
+          {/* ── Inline error message ── */}
+          {error && (
+            <div style={styles.errorBox}>
+              <AlertCircle size={13} color="#ff4655" style={{ flexShrink: 0 }} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <button type="submit" className={shaking ? 'shake' : ''} style={styles.submitBtn}>
             CREATE ACCOUNT <ChevronRight size={16} style={{ marginLeft: 6 }} />
           </button>
         </form>
@@ -100,7 +122,6 @@ const handleSubmit = async (e) => {
         </p>
       </div>
 
-      {/* RIGHT PANEL */}
       <div style={styles.rightPanel}>
         <div style={styles.imageOverlay} />
         <img src="/src/assets/valorant.jpg" alt="Valorant" style={styles.bgImage} />
@@ -119,8 +140,7 @@ const Field = ({ label, name, type = 'text', value, onChange, placeholder, icon 
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
       <span style={{ position: 'absolute', left: 11, pointerEvents: 'none' }}>{icon}</span>
       <input name={name} type={type} value={value} onChange={onChange} placeholder={placeholder}
-        style={{ width: '100%', background: '#0a0d14', border: '1px solid #1e2535', borderRadius: 6, padding: '10px 10px 10px 34px', color: '#fff', fontFamily: "'Barlow Condensed', 'Arial Narrow', sans-serif", fontSize: 13, letterSpacing: 1, outline: 'none', boxSizing: 'border-box' }}
-      />
+        style={{ width: '100%', background: '#0a0d14', border: '1px solid #1e2535', borderRadius: 6, padding: '10px 10px 10px 34px', color: '#fff', fontFamily: "'Barlow Condensed', 'Arial Narrow', sans-serif", fontSize: 13, letterSpacing: 1, outline: 'none', boxSizing: 'border-box' }} />
     </div>
   </div>
 );
@@ -147,6 +167,7 @@ const styles = {
   avatarCircle: { width: 46, height: 46, borderRadius: '50%', border: '2px dashed rgba(255,70,85,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', background: 'rgba(255,70,85,0.05)', flexShrink: 0 },
   avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
   roleTag: { display: 'flex', alignItems: 'center', background: 'rgba(255,70,85,0.05)', border: '1px solid rgba(255,70,85,0.12)', borderRadius: 6, padding: '9px 12px' },
+  errorBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,70,85,0.08)', border: '1px solid rgba(255,70,85,0.3)', borderRadius: 6, padding: '10px 12px', fontSize: 12, color: '#ff4655', letterSpacing: 1 },
   submitBtn: { background: '#ff4655', border: 'none', borderRadius: 6, padding: '13px 0', color: '#fff', fontFamily: "'Barlow Condensed', 'Arial Narrow', sans-serif", fontWeight: 900, fontSize: 14, letterSpacing: 3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   loginPrompt: { textAlign: 'center', fontSize: 11, color: '#444', marginTop: 16, letterSpacing: 1 },
   loginLink: { color: '#ff4655', cursor: 'pointer', fontWeight: 700 },
