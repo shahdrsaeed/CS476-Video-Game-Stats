@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, ChevronUp } from 'lucide-react';
-import { PLAYERS_LIST } from '../data/mockData';
+// import { PLAYERS_LIST } from '../data/mockData';
+import { getUser } from '../services/userAPI';
 import Navbar from '../components/Navbar'
 
 // ── Rank color helper ──
@@ -18,8 +19,107 @@ const resultColor = (r) => r === 'W' ? '#22c55e' : '#ff4655';
 
 const PlayerProfileView = () => {
   // For now show the first player (later this will come from login/routing)
-  const player = PLAYERS_LIST[0];
+  // const player = PLAYERS_LIST[0];
+  const [player, setPlayer] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [expandedMatch, setExpandedMatch] = useState(null);
+
+  useEffect(() => {
+    const fetchPlayer = async () => {
+      try {
+        const stored = localStorage.getItem('user');
+        if (!stored) return;
+
+        const { _id } = JSON.parse(stored);
+        const res = await getUser(_id);
+        const raw = res.data;
+
+        // Adapt DB shape → what the JSX expects
+        const adapted = {
+          ...raw,
+
+          // Fields not yet in DB — show fallback values
+          valorantId: raw.username,
+          team:       raw.teamId ?? 'No Team',
+          playtime:   'N/A',
+          peakRank:   raw.rank,
+          peakRR:     raw.rr,
+
+          // Computed stats not yet in DB
+          damagePerRound: 'N/A',
+          kast:           'N/A',
+          killsPerRound:  raw.stats?.kills && raw.matchesPlayed
+                            ? (raw.stats.kills / raw.matchesPlayed).toFixed(2)
+                            : 'N/A',
+          ddDeltaPerRound: 'N/A',
+          roundWinRate:    'N/A',
+
+          // roles doesn't exist yet — empty array so .map() won't crash
+          roles: [],
+
+          // topAgents: reshape populated agent objects
+          topAgents: (raw.topAgents ?? []).map(a => ({
+            name:     a.agent?.name    ?? 'Unknown',
+            hours:    'N/A',
+            matches:  a.matchesPlayed  ?? 0,
+            winRate:  a.matchesPlayed
+                        ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%'
+                        : '0%',
+            kd:       a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
+            acs:      'N/A',
+          })),
+
+          // topWeapons: reshape populated weapon objects
+          topWeapons: (raw.topWeapons ?? []).map(w => {
+            const total = (w.headshotKills ?? 0) + (w.bodyshotKills ?? 0) + (w.legshotKills ?? 0);
+            return {
+              weapon:      w.weapon?.name ?? 'Unknown',
+              type:        w.weapon?.type ?? '',
+              kills:       w.totalKills   ?? 0,
+              headshotPct: total ? ((w.headshotKills / total) * 100).toFixed(1) + '%' : '0%',
+              bodyPct:     total ? ((w.bodyshotKills  / total) * 100).toFixed(1) + '%' : '0%',
+              legsPct:     total ? ((w.legshotKills   / total) * 100).toFixed(1) + '%' : '0%',
+            };
+          }),
+
+          // topMaps: reshape populated map objects
+          topMaps: (raw.topMaps ?? []).map(m => ({
+            map:     m.map?.name ?? 'Unknown',
+            wins:    m.wins      ?? 0,
+            losses:  m.losses    ?? 0,
+            winRate: m.matchesPlayed
+                      ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%'
+                      : '0%',
+          })),
+
+          // last20Matches → recentMatches (reshape for the table)
+          recentMatches: (raw.last20Matches ?? []).map(m => ({
+            date:      m.match?.date   ?? 'N/A',
+            map:       m.match?.map    ?? 'N/A',
+            result:    m.result === 'Win' ? 'W' : 'L',
+            score:     m.match?.score  ?? 'N/A',
+            kd:        m.match?.kd     ?? 0,
+            kda:       m.match?.kda    ?? 'N/A',
+            ddDelta:   m.match?.ddDelta ?? 0,
+            hs:        m.match?.hs     ?? 0,
+            acs:       m.match?.acs    ?? 0,
+            placement: m.match?.placement ?? 'N/A',
+          })),
+        };
+
+        setPlayer(adapted);
+      } catch (err) {
+        console.error('Failed to fetch player:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlayer();
+  }, []);
+
+  if (loading) return <div style={{ color: '#fff', padding: 40 }}>Loading...</div>;
+  if (!player) return <div style={{ color: '#fff', padding: 40 }}>No player data found.</div>;
 
   return (
     <div style={styles.page}>
@@ -31,9 +131,9 @@ const PlayerProfileView = () => {
         {/* ── PROFILE BANNER ── */}
         <div style={styles.profileBanner}>
           <div style={styles.bannerLeft}>
-            <img src={player.avatar} alt={player.name} style={styles.bannerAvatar} />
+            <img src={player.avatar} alt={player.username} style={styles.bannerAvatar} />
             <div>
-              <div style={styles.bannerName}>{player.name}</div>
+              <div style={styles.bannerName}>{player.username}</div>
               <div style={styles.bannerTag}>{player.valorantId}</div>
               <div style={styles.bannerMeta}>
                 <span style={styles.metaBadge}>{player.team}</span>
@@ -44,8 +144,8 @@ const PlayerProfileView = () => {
           </div>
           <div style={styles.bannerRank}>
             <div style={{ fontSize: 11, color: '#555', letterSpacing: 2, marginBottom: 4 }}>CURRENT RANK</div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: rankColor(player.currentRank), letterSpacing: 2 }}>{player.currentRank}</div>
-            <div style={{ fontSize: 18, color: '#fff', fontWeight: 700 }}>{player.rankRating} <span style={{ fontSize: 12, color: '#555' }}>RR</span></div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: rankColor(player.rank), letterSpacing: 2 }}>{player.rank}</div>
+            <div style={{ fontSize: 18, color: '#fff', fontWeight: 700 }}>{player.rr} <span style={{ fontSize: 12, color: '#555' }}>RR</span></div>
             <div style={{ fontSize: 11, color: '#444', marginTop: 4 }}>Peak: {player.peakRank} {player.peakRR} RR</div>
           </div>
         </div>
@@ -54,9 +154,9 @@ const PlayerProfileView = () => {
         <div style={styles.statCardsRow}>
           {[
             { label: 'K/D RATIO', value: player.kdRatio, sub: 'Top 9.0%' },
-            { label: 'WIN RATE', value: player.winRate, sub: `${player.wins}W - ${player.losses}L` },
-            { label: 'ACS', value: player.acs, sub: 'Top 7.0%' },
-            { label: 'HEADSHOT %', value: player.headshotPercent, sub: 'Top 3.1%' },
+            { label: 'WIN RATE', value: player.winRate, sub: `${player.stats.wins}W - ${player.stats.losses}L` },
+            { label: 'ACS', value: player.stats.acs, sub: 'Top 7.0%' },
+            { label: 'HEADSHOT %', value: player.headshotPercentage, sub: 'Top 3.1%' },
             { label: 'DMG/ROUND', value: player.damagePerRound, sub: 'Top 7.0%' },
             { label: 'KAST', value: player.kast, sub: 'Top 19.0%' },
           ].map((s) => (
@@ -72,14 +172,14 @@ const PlayerProfileView = () => {
         <div style={styles.sectionTitle}><TrendingUp size={14} color="#ff4655" style={{ marginRight: 8 }} />DETAILED STATS</div>
         <div style={styles.detailGrid}>
           {[
-            { label: 'Kills', value: player.kills },
-            { label: 'Deaths', value: player.deaths },
-            { label: 'Assists', value: player.assists },
+            { label: 'Kills', value: player.stats.kills },
+            { label: 'Deaths', value: player.stats.deaths },
+            { label: 'Assists', value: player.stats.assists },
             { label: 'KAD Ratio', value: player.kadRatio },
             { label: 'Kills/Round', value: player.killsPerRound },
-            { label: 'First Bloods', value: player.firstBloods },
-            { label: 'Flawless Rounds', value: player.flawlessRounds },
-            { label: 'Aces', value: player.aces },
+            { label: 'First Bloods', value: player.stats.firstBloods },
+            { label: 'Flawless Rounds', value: player.stats.flawlessRounds },
+            { label: 'Aces', value: player.stats.aces },
             { label: 'DD∆/Round', value: player.ddDeltaPerRound },
             { label: 'Round Win %', value: player.roundWinRate },
           ].map((s) => (
@@ -97,9 +197,9 @@ const PlayerProfileView = () => {
           <div style={styles.card}>
             <div style={styles.cardTitle}><Crosshair size={13} color="#ff4655" style={{ marginRight: 7 }} />ACCURACY</div>
             {[
-              { zone: 'Head', pct: player.accuracy.head, color: '#ff4655' },
-              { zone: 'Body', pct: player.accuracy.body, color: '#38bdf8' },
-              { zone: 'Legs', pct: player.accuracy.legs, color: '#888' },
+              { zone: 'Head', pct: player.headshotPercentage + '%', color: '#ff4655' },
+              { zone: 'Body', pct: player.bodyshotPercentage + '%', color: '#38bdf8' },
+              { zone: 'Legs', pct: player.legshotPercentage + '%', color: '#888' },
             ].map((a) => (
               <div key={a.zone} style={styles.accuracyRow}>
                 <span style={styles.accuracyLabel}>{a.zone}</span>
