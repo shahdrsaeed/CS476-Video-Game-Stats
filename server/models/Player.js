@@ -39,7 +39,7 @@ const PlayerSchema = new mongoose.Schema({
     type: Number,
     default: 1,
     required: true,
-    min: 0
+    min: 1
   },
 
   stats: { // dto for player stats
@@ -148,24 +148,26 @@ PlayerSchema.virtual('winRate').get(function () {
   return ((this.stats.wins / total) * 100).toFixed(2);
 });
 
+// TODO: Shahd, please check if this is correct
+
 // Headshot percentage
 PlayerSchema.virtual('headshotPercentage').get(function () {
-  const totalKills = this.damageDealt;
-  if (totalKills === 0) return 0;
+  const totalKills = this.stats.damageDealt;
+  if (totalKills === 0) return 0.00;
   return ((this.stats.headshots / totalKills) * 100).toFixed(2);
 });
 
 // Bodyshot percentage
 PlayerSchema.virtual('bodyshotPercentage').get(function () {
-  const totalKills = this.damageDealt;
-  if (totalKills === 0) return 0;
+  const totalKills = this.stats.damageDealt;
+  if (totalKills === 0) return 0.00;
   return ((this.stats.bodyshots / totalKills) * 100).toFixed(2);
 });
 
 // Legshot percentage
 PlayerSchema.virtual('legshotPercentage').get(function () {
   const totalKills = this.damageDealt;
-  if (totalKills === 0) return 0;
+  if (totalKills === 0) return 0.00;
   return ((this.stats.legshots / totalKills) * 100).toFixed(2);
 });
 

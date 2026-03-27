@@ -1,8 +1,14 @@
 const mongoose = require('mongoose');
 const User = require('./User');
+const Team = require('./Team');
 
 // Define the Coach model in MongoDB
 const CoachSchema = new mongoose.Schema({
+     teamId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Team',
+        required: true
+    },
     title: { // title of the coach (e.g. Head Coach, Assistant Coach)
         type: String,
         required: true,
