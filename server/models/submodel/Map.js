@@ -6,7 +6,18 @@ const MapSchema = new mongoose.Schema ({
     name: {
         type: String,
         required: true, // every map must have a name
-        unique: true // no two maps can share the same name
+        unique: true, // no two maps can share the same name
+        enum: ['Ascent',
+        'Bind',
+        'Haven',
+        'Split',
+        'Icebox',
+        'Breeze',
+        'Fracture',
+        'Pearl',
+        'Lotus',
+        'Sunset'
+        ]
     },
     siteAmount: { // all maps either have 2 or 3 sites
         type: Number,
