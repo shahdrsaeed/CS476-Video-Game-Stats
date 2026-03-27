@@ -23,8 +23,9 @@ describe("Coach Model Test", () => {
   // Clear the collections before each test
   beforeEach(async () => {
     await User.deleteMany({});
-    await Team.deleteMany({});
     await Coach.syncIndexes();
+    await Coach.deleteMany({});
+    await Team.deleteMany({});
   });
 
   // Disconnect after tests
@@ -38,7 +39,10 @@ describe("Coach Model Test", () => {
       username: "aliceCoach",
       email: "alice@example.com",
       password: "securepassword",
-      teamId: new mongoose.Types.ObjectId() // dummy team ID for testing
+      imageURL: "http://example.com/image.jpg",
+      teamId: new mongoose.Types.ObjectId(),
+      title: "Head Coach",
+      company: "Esports Org",
     });
 
     const savedCoach = await coach.save();
@@ -47,6 +51,8 @@ describe("Coach Model Test", () => {
     expect(savedCoach.username).toBe("aliceCoach");
     expect(savedCoach.email).toBe("alice@example.com");
     expect(savedCoach.teamId).toBeDefined();
+    expect(savedCoach.title).toBe("Head Coach");
+    expect(savedCoach.company).toBe("Esports Org");
   });
 
   // Test: Required fields are validated
@@ -72,7 +78,10 @@ describe("Coach Model Test", () => {
       username: "charlieCoach",
       email: "charlie@example.com",
       password: "pass123",
-      teamId: new mongoose.Types.ObjectId()
+      imageURL: "http://example.com/alpha.jpg",
+      teamId: new mongoose.Types.ObjectId(),
+      title: "Head Coach",
+      company: "Esports Org"
     });
     await firstCoach.save();
 
@@ -80,7 +89,10 @@ describe("Coach Model Test", () => {
       username: "charlieCoach",  // duplicate username
       email: "charlie@example.com", // duplicate email
       password: "differentpass",
-      teamId: new mongoose.Types.ObjectId()
+      imageURL: "http://example.com/beta.jpg",
+      teamId: new mongoose.Types.ObjectId(),
+      title: "Head Coach",
+      company: "Esports Org"
     });
 
     let err;
@@ -101,7 +113,10 @@ describe("Coach Model Test", () => {
       username: "daveCoach",
       email: "dave@example.com",
       password: "pass123",
-      teamId: new mongoose.Types.ObjectId()
+      imageURL: "http://example.com/dave.jpg",
+      teamId: new mongoose.Types.ObjectId(),
+      title: "Assistant Coach",
+      company: "Esports Org"
     });
     const savedCoach = await coach.save();
 
@@ -120,5 +135,4 @@ describe("Coach Model Test", () => {
     expect(populatedTeam.coach.username).toBe("daveCoach");
     expect(populatedTeam.coach.email).toBe("dave@example.com");
   });
-
 });

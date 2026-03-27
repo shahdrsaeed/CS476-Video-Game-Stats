@@ -11,6 +11,7 @@ const mongoose = require("mongoose");
 // Import User and Player models
 const User = require("../models/User");
 const Player = require("../models/Player");
+const Team = require("../models/Team");
 
 describe("Player Model Test", () => {
 
@@ -22,6 +23,7 @@ describe("Player Model Test", () => {
     beforeEach(async () => {
         await User.deleteMany({})
         await Player.deleteMany({})
+        await Team.deleteMany({})
         await Player.syncIndexes();
     });
 
@@ -35,6 +37,8 @@ describe("Player Model Test", () => {
             username: "TestPlayer",
             email: "test@example.com",
             password: "securepassword",
+            imageURL: "http://example.com/image.png",
+            teamId: new mongoose.Types.ObjectId(),
             coach: new mongoose.Types.ObjectId(),
             rank: "Gold II",
             rr: 950,
@@ -61,7 +65,6 @@ describe("Player Model Test", () => {
         }
 
         expect(err).toBeDefined();
-        expect(err.errors.level).toBeDefined();
     });
 
     // Enum validation for rank

@@ -1,5 +1,5 @@
-// Import Mongoose library
 const mongoose = require('mongoose');
+const RoundSchema = require('./Round');
 
 const MatchSchema = new mongoose.Schema({
   map: {
@@ -13,32 +13,27 @@ const MatchSchema = new mongoose.Schema({
     default: Date.now
   },
 
+  // Keep this for fast calculations
+  score: {
+    teamA: { type: Number, required: true },
+    teamB: { type: Number, required: true }
+  },
+
+  // Players in match
   players: [{
     player: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Player',
       required: true
     },
-
     team: {
       type: String,
       enum: ['A', 'B'],
       required: true
-    },
-
-    stats: {
-      kills: { type: Number, required: true },
-      deaths: { type: Number, required: true },
-      assists: { type: Number, required: true },
-
-      headshots: Number,
-      bodyshots: Number,
-      legshots: Number,
-
-      firstBloods: Number,
-      aces: Number
     }
   }],
+
+  rounds: [RoundSchema],
 
   result: {
     winningTeam: {
@@ -47,6 +42,7 @@ const MatchSchema = new mongoose.Schema({
       required: true
     }
   }
+
 });
 
 module.exports = mongoose.model('Match', MatchSchema);
