@@ -6,6 +6,7 @@ const {
   calculateDDDeltaPerRound
 } = require('../helpers/statsCalculator');
 
+// Get player stats - this would be used to retrieve a player's stats for display on the frontend
 const getPlayerStats = async (req, res) => {
   try {
     const { id } = req.params;
@@ -37,6 +38,41 @@ const getPlayerStats = async (req, res) => {
   }
 };
 
+// Get player by ID - this would be used to retrieve a player's profile and stats for display on the frontend
+const getPlayerById = async (req, res) => {
+  try {
+    const player = await Player.findById(req.params.id)
+      .select('-password');
+
+    if (!player) {
+      return res.status(404).json({ message: 'Player not found' });
+    }
+
+    res.json(player);
+
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Update player stats - this would be called after a match is completed to update the player's stats based on the match results
+const updatePlayer = async (req, res) => {
+  try {
+    const updatedPlayer = await Player.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+
+    res.json(updatedPlayer);
+
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
-  getPlayerStats
+  getPlayerStats,
+  getPlayerById,
+  updatePlayer
 };
