@@ -13,7 +13,10 @@ app.use(cors({ origin: 'http://localhost:5173' }));
 connectDB();
 
 // Routes
-const userRoutes = require('./routes/userRoutes'); // ✅ correct path
+const userRoutes = require('./routes/userRoutes');
+const playerRoutes = require('./routes/playerRoutes');
+
+app.use('/api/players', playerRoutes);
 app.use('/api/users', userRoutes);
 
 module.exports = app;
