@@ -85,7 +85,7 @@ const calculateDDDeltaPerRound = (player) => {
  * @param {Object} player - Player document with populated last20Matches.match
  * @returns {String} average ACS as string with 2 decimals
  */
-const calcualteACS = (player) => {
+const calculateACS = (player) => {
   let totalDamage = 0;
   let totalRounds = 0;
 
