@@ -7,6 +7,8 @@ const bcrypt = require('bcrypt');
 exports.create = async (req, res) => {
   try {
     const { username, email, password, role, ...rest } = req.body;
+    const imageURL = req.file ? req.file.path : ''; // added this line
+
 
     // basic validation
     if (!username || !email || !password || !role) {
@@ -29,6 +31,7 @@ exports.create = async (req, res) => {
         username,
         email,
         password: hashedPassword,
+        imageURL, // add this
         ...rest // rank, level, etc.
       });
     } 
@@ -37,6 +40,7 @@ exports.create = async (req, res) => {
         username,
         email,
         password: hashedPassword,
+        imageURL, // add this
         ...rest
       });
     } 
