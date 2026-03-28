@@ -15,8 +15,11 @@ connectDB();
 // Routes
 const userRoutes = require('./routes/userRoutes');
 const playerRoutes = require('./routes/playerRoutes');
+const teamRoutes = require('./routes/teamRoutes');
+
 
 app.use('/api/players', playerRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/teams', teamRoutes);
 
 module.exports = app;
