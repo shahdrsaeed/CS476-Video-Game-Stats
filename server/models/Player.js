@@ -47,15 +47,14 @@ const PlayerSchema = new mongoose.Schema({
     deaths: { type: Number, default: 0, min: 0 },
     assists: { type: Number, default: 0, min: 0 },
 
-    acs: { type: Number, default: 0, min: 0 },
-
     wins: { type: Number, default: 0, min: 0 },
     losses: { type: Number, default: 0, min: 0 },
 
     firstBloods: { type: Number, default: 0, min: 0 },
+    firstDeaths: { type: Number, default: 0, min: 0 },
     aces: { type: Number, default: 0, min: 0 },
     flawlessRounds: { type: Number, default: 0, min: 0 },
-
+    
     headshots: { type: Number, default: 0, min: 0 },
     bodyshots: { type: Number, default: 0, min: 0 },
     legshots: { type: Number, default: 0, min: 0 }
@@ -127,9 +126,9 @@ PlayerSchema.virtual('matchesPlayed').get(function () {
 
 // K/D ratio
 PlayerSchema.virtual('kdRatio').get(function () {
-  return this.stats.deaths === 0
-    ? this.stats.kills
-    : (this.stats.kills / this.stats.deaths).toFixed(2);
+  if (this.stats.deaths === 0)
+    return this.stats.kills.toFixed(2);
+  return (this.stats.kills / this.stats.deaths).toFixed(2);
 });
 
 // (K+A)/D ratio
@@ -144,31 +143,29 @@ PlayerSchema.virtual('kadRatio').get(function () {
 // Win rate percentage
 PlayerSchema.virtual('winRate').get(function () {
   const total = this.stats.wins + this.stats.losses;
-  if (total === 0) return 0;
+  if (total === 0) return '0.00';
   return ((this.stats.wins / total) * 100).toFixed(2);
 });
 
-// TODO: Shahd, please check if this is correct
-
 // Headshot percentage
 PlayerSchema.virtual('headshotPercentage').get(function () {
-  const totalKills = this.stats.damageDealt;
-  if (totalKills === 0) return 0.00;
-  return ((this.stats.headshots / totalKills) * 100).toFixed(2);
+  const totalHits = this.stats.headshots + this.stats.bodyshots + this.stats.legshots;
+  if (totalHits === 0) return '0.00';
+  return ((this.stats.headshots / totalHits) * 100).toFixed(2);
 });
 
 // Bodyshot percentage
 PlayerSchema.virtual('bodyshotPercentage').get(function () {
-  const totalKills = this.stats.damageDealt;
-  if (totalKills === 0) return 0.00;
-  return ((this.stats.bodyshots / totalKills) * 100).toFixed(2);
+  const totalHits = this.stats.headshots + this.stats.bodyshots + this.stats.legshots;
+  if (totalHits === 0) return '0.00';
+  return ((this.stats.bodyshots / totalHits) * 100).toFixed(2);
 });
 
 // Legshot percentage
 PlayerSchema.virtual('legshotPercentage').get(function () {
-  const totalKills = this.damageDealt;
-  if (totalKills === 0) return 0.00;
-  return ((this.stats.legshots / totalKills) * 100).toFixed(2);
+  const totalHits = this.stats.headshots + this.stats.bodyshots + this.stats.legshots;
+  if (totalHits === 0) return '0.00';
+  return ((this.stats.legshots / totalHits) * 100).toFixed(2);
 });
 
 

@@ -80,8 +80,35 @@ const calculateDDDeltaPerRound = (player) => {
   return (totalDelta / totalRounds).toFixed(2);
 };
 
+/**
+ * Calculate ACS over last 20 matches
+ * @param {Object} player - Player document with populated last20Matches.match
+ * @returns {String} average ACS as string with 2 decimals
+ */
+const calcualteACS = (player) => {
+  let totalDamage = 0;
+  let totalRounds = 0;
+
+  player.last20Matches.forEach(entry => {
+    const match = entry.match;
+    if (!match || !match.rounds) return;
+
+    match.rounds.forEach(round => {
+      const p = round.players.find(rp => rp.player.toString() === player._id.toString());
+      if (!p) return;
+
+      totalRounds++;
+      totalDamage += damageDealt;
+    });
+  });
+
+  if (totalRounds === 0) return '0.00';
+  return (totalDamage / totalRounds).toFixed(2);
+};
+
 module.exports = {
   calculateRoundWinPercentage,
   calculateKAST,
-  calculateDDDeltaPerRound
+  calculateDDDeltaPerRound,
+  calculateACS
 };
