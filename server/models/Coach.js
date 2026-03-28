@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const User = require('./User');
-const Team = require('./Team');
 
 // Define the Coach model in MongoDB
 const CoachSchema = new mongoose.Schema({
