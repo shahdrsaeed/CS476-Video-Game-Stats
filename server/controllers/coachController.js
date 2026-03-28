@@ -1,4 +1,5 @@
 const Player = require('../models/Player');
+const { calculateACS } = require('../helpers/statsCalculator');
 
 // Get all players assigned to a coach
 const getPlayers = async (req, res) => {
@@ -45,7 +46,8 @@ const getAggregatedStats = async (req, res) => {
     players.forEach(player => {
       totalKd += parseFloat(player.kdRatio);
       totalWinRate += parseFloat(player.winRate);
-      totalAcs += player.stats.acs;
+      // Calculate ACS for each player using the helper function
+      totalAcs += parseFloat(calculateACS(player));
       totalMatches += player.matchesPlayed;
     });
 
