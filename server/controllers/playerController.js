@@ -1,5 +1,5 @@
 const Player = require('../models/Player');
-const Match = require('../models/submodel/Match');
+
 const {
   calculateRoundWinPercentage,
   calculateKAST,
@@ -24,13 +24,15 @@ const getPlayerStats = async (req, res) => {
     const roundWinPercentage = calculateRoundWinPercentage(player);
     const kast = calculateKAST(player);
     const ddDeltaPerRound = calculateDDDeltaPerRound(player);
+    const acs = calculateACS(player);
 
     // Return player data along with calculated stats in json response
     return res.json({
       player,
       roundWinPercentage,
       kast,
-      ddDeltaPerRound
+      ddDeltaPerRound,
+      acs
     });
   } catch (error) {
     console.error(error);
