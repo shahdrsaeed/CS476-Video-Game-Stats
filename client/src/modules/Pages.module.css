@@ -17,3 +17,8 @@
 .rankBadge { color: #ff4655; font-weight: 900; font-size: 14px; text-transform: uppercase; }
 .winRate { background: rgba(255, 70, 85, 0.1); padding: 4px 10px; border-radius: 4px; color: #ff4655; font-weight: bold; font-size: 12px; }
 .points { font-style: italic; font-weight: 900; font-size: 22px; }
+
+/* ── GeneralView fallback states ── */
+.emptyState { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; gap: 12px; }
+.emptyStateTitle { color: #555; letter-spacing: 2px; font-size: 14px; text-transform: uppercase; }
+.emptyStateSubtitle { color: #333; font-size: 12px; }

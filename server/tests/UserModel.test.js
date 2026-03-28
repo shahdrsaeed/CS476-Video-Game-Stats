@@ -10,6 +10,7 @@ const mongoose = require("mongoose")
 
 // Import User model
 const User = require("../models/User")
+const Team = require("../models/Team")
 
 describe("User Model Test", () => {
 
@@ -34,7 +35,9 @@ describe("User Model Test", () => {
     const validUser = new User({
       username: "testuser",
       email: "test@email.com",
-      password: "hashedpassword"
+      password: "hashedpassword",
+      imageURL: "http://example.com/image.jpg",
+      teamId: new mongoose.Types.ObjectId(),
     })
     const savedUser = await validUser.save()
     expect(savedUser._id).toBeDefined()
@@ -61,14 +64,18 @@ describe("User Model Test", () => {
   const firstUser = new User({
     username: "testuser",
     email: "test@email.com",
-    password: "hashedpassword"
+    password: "hashedpassword",
+    imageURL: "http://example.com/image.jpg",
+    teamId: new mongoose.Types.ObjectId(),
   })
   await firstUser.save()
 
   const duplicateUser = new User({
     username: "testuser", // duplicate username
     email: "test@email.com", // duplicate email
-    password: "differentpassword"
+    password: "differentpassword",
+    imageURL: "http://example.com/image.jpg",
+    teamId: new mongoose.Types.ObjectId(),
   })
 
   let err

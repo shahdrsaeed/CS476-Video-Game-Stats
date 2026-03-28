@@ -21,7 +21,6 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    // ADD imageURL
     imageURL:{
         type: String,
         required: true,
@@ -35,4 +34,4 @@ const UserSchema = new mongoose.Schema({
     }
 }, options)
 
-module.exports = mongoose.model("User", UserSchema)
+module.exports = mongoose.model("User", UserSchema);
