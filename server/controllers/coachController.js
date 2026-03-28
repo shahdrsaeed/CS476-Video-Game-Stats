@@ -1,7 +1,4 @@
-// controllers/coachController.js
-const Coach = require('../models/Coach');
 const Player = require('../models/Player');
-const Team = require('../models/Team');
 
 // Get all players assigned to a coach
 const getPlayers = async (req, res) => {
