@@ -62,7 +62,7 @@ const PlayerSchema = new mongoose.Schema({
     
     headshots: { type: Number, default: 0, min: 0 },
     bodyshots: { type: Number, default: 0, min: 0 },
-    legshots: { type: Number, default: 0, min: 0 },
+    legshots: { type: Number, default: 0, min: 0 }
   },
 
   topWeapons: [{ // top 3 weapons for the player with stats
