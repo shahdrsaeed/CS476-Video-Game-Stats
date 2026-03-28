@@ -12,7 +12,7 @@ const Navbar = () => {
     { label: 'MY PROFILE',    path: '/player',        icon: <User size={14} />, playerOnly: true },
     { label: 'TEAM SEARCH',   path: '/search',        icon: <Search size={14} /> },
     { label: 'COACH PANEL',   path: '/coach',         icon: <Users size={14} />, coachOnly: true },
-    { label: 'REGISTRATIONS', path: '/registrations', icon: <ClipboardList size={14} />, coachOnly: true },
+    { label: 'REGISTRATIONS', path: '/registrations', icon: <ClipboardList size={14} />, playerOnly: true },
   ];
 
   const visibleLinks = links.filter(l => {
