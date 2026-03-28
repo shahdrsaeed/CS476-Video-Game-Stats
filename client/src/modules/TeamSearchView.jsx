@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-import { PLAYERS_LIST } from '../data/mockData';
+// import { PLAYERS_LIST } from '../data/mockData';
+import { getAllPlayers } from '../services/UserApi'; 
 import { Search, Shield, User, ChevronRight, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
 
 const rankColor = (rank) => {
@@ -21,6 +22,8 @@ const getRequestStatus = (playerName, requests) => {
 
 const TeamSearchView = () => {
   const [query, setQuery]       = useState('');
+  const [players, setPlayers]   = useState([]);
+  const [loading, setLoading]   = useState(true);
   const [selected, setSelected] = useState(null);
   const [requests, setRequests] = useState([]);
 
@@ -35,25 +38,41 @@ const TeamSearchView = () => {
     localStorage.setItem('registrationRequests', JSON.stringify(requests));
   }, [requests]);
 
+  // Fetch all players on mount
+  useEffect(() => {
+    const fetchPlayers = async () => {
+      try {
+        const res = await getAllPlayers();
+        setPlayers(res.data);
+      } catch (err) {
+        console.error('Failed to fetch players:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPlayers();
+  }, []);
+
   const handleRequest = (player) => {
-    const status = getRequestStatus(player.name, requests);
+    const status = getRequestStatus(player.username, requests);
     if (status !== 'none') return; // already requested
 
     const newRequest = {
       id: Date.now(),
-      player: player.name,
-      team: player.team,
+      player: player.username,
+      team: player.teamId ?? 'No Team',
       date: new Date().toISOString().split('T')[0],
       status: 'Pending',
     };
     setRequests(prev => [...prev, newRequest]);
   };
 
-  const filtered = PLAYERS_LIST.filter(p =>
-    p.name.toLowerCase().includes(query.toLowerCase()) ||
-    p.valorantId.toLowerCase().includes(query.toLowerCase()) ||
-    p.team.toLowerCase().includes(query.toLowerCase())
+   // Filter locally by username
+  const filtered = players.filter(p =>
+    p.username.toLowerCase().includes(query.toLowerCase())
   );
+
+  if (loading) return <div style={{ color: '#fff', padding: 40 }}>Loading...</div>;
 
   return (
     <div style={styles.page}>
@@ -94,32 +113,32 @@ const TeamSearchView = () => {
           ) : (
             filtered.map(player => (
               <div
-                key={player.id}
+                key={player._id}
                 style={styles.card}
                 onClick={() => setSelected(player)}
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,70,85,0.4)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#1a1f2e'}
               >
                 <div style={styles.cardTop}>
-                  <img src={player.avatar} alt={player.name} style={styles.cardAvatar} />
+                  <img src={player.imageURL} alt={player.username} style={styles.cardAvatar} />
                   <div style={{ flex: 1 }}>
-                    <div style={styles.cardName}>{player.name}</div>
-                    <div style={styles.cardId}>{player.valorantId}</div>
-                    <div style={{ ...styles.cardRank, color: rankColor(player.currentRank) }}>
-                      {player.currentRank} · {player.rankRating} RR
+                    <div style={styles.cardName}>{player.username}</div>
+                    <div style={styles.cardId}>{player.valorantId}</div> {/* not in player schema */}
+                    <div style={{ ...styles.cardRank, color: rankColor(player.rank) }}>
+                      {player.rank} · {player.rr} RR
                     </div>
                   </div>
                 </div>
                 <div style={styles.teamBadge}>
                   <Shield size={11} color="#ff4655" style={{ marginRight: 5 }} />
-                  {player.team}
+                  {player.teamId ?? 'No Team'}
                 </div>
                 <div style={styles.cardStats}>
                   {[
                     { label: 'K/D',  value: player.kdRatio },
                     { label: 'WIN%', value: player.winRate },
-                    { label: 'ACS',  value: player.acs },
-                    { label: 'HS%',  value: player.headshotPercent },
+                    { label: 'ACS',  value: player.stats?.acs },
+                    { label: 'HS%',  value: player.headshotPercentage },
                   ].map(s => (
                     <div key={s.label} style={styles.statItem}>
                       <div style={styles.statLabel}>{s.label}</div>
@@ -144,12 +163,12 @@ const TeamSearchView = () => {
             {/* Header with Request button */}
             <div style={modal.header}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <img src={selected.avatar} alt={selected.name} style={modal.avatar} />
+                <img src={selected.avatar} alt={selected.username} style={modal.avatar} />
                 <div>
-                  <div style={modal.name}>{selected.name}</div>
-                  <div style={{ fontSize: 12, color: '#555' }}>{selected.valorantId}</div>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: rankColor(selected.currentRank), marginTop: 4 }}>
-                    {selected.currentRank} · {selected.rankRating} RR
+                  <div style={modal.name}>{selected.username}</div>
+                  <div style={{ fontSize: 12, color: '#555' }}>{selected.valorantId}</div> {/* not in player schema */}
+                  <div style={{ fontSize: 14, fontWeight: 900, color: rankColor(selected.rank), marginTop: 4 }}>
+                    {selected.rank} · {selected.rr} RR
                   </div>
                 </div>
               </div>
@@ -157,7 +176,7 @@ const TeamSearchView = () => {
               {/* ── REQUEST BUTTON (top right) ── */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <RequestButton
-                  status={getRequestStatus(selected.name, requests)}
+                  status={getRequestStatus(selected.username, requests)}
                   onClick={() => handleRequest(selected)}
                 />
                 <button style={modal.closeBtn} onClick={() => setSelected(null)}>
@@ -171,12 +190,12 @@ const TeamSearchView = () => {
               {[
                 { label: 'K/D',     value: selected.kdRatio },
                 { label: 'WIN RATE',value: selected.winRate },
-                { label: 'ACS',     value: selected.acs },
-                { label: 'HS%',     value: selected.headshotPercent },
-                { label: 'KAST',    value: selected.kast },
-                { label: 'DMG/RND', value: selected.damagePerRound },
-                { label: 'KILLS',   value: selected.kills },
-                { label: 'MATCHES', value: selected.matches },
+                { label: 'ACS',     value: selected.stats?.acs },
+                { label: 'HS%',     value: selected.headshotPercentage },
+                { label: 'KAST',    value: 'N/A' },
+                { label: 'DMG/RND', value: 'N/A' },
+                { label: 'KILLS',   value: selected.stats?.kills },
+                { label: 'MATCHES', value: (selected.stats?.wins ?? 0) + (selected.stats?.losses ?? 0) },
               ].map(s => (
                 <div key={s.label} style={modal.statBox}>
                   <div style={{ fontSize: 10, color: '#555', letterSpacing: 1 }}>{s.label}</div>
@@ -192,7 +211,7 @@ const TeamSearchView = () => {
                 <tr>{['AGENT', 'MATCHES', 'WIN%', 'K/D', 'ACS'].map(h => <th key={h} style={modal.th}>{h}</th>)}</tr>
               </thead>
               <tbody>
-                {selected.topAgents.map(a => (
+                {(selected.topAgents ?? []).map(a => (
                   <tr key={a.name}>
                     <td style={modal.td}><strong style={{ color: '#fff' }}>{a.name}</strong><div style={{ fontSize: 10, color: '#555' }}>{a.role}</div></td>
                     <td style={modal.td}>{a.matches}</td>
@@ -206,7 +225,7 @@ const TeamSearchView = () => {
 
             {/* Top maps */}
             <div style={modal.sectionTitle}><Shield size={12} color="#ff4655" style={{ marginRight: 6 }} />TOP MAPS</div>
-            {selected.topMaps.map(m => (
+            {(selected.topMaps ?? []).map(m => (
               <div key={m.map} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', padding: '8px 0' }}>
                 <span style={{ color: '#fff', fontWeight: 700, flex: 1 }}>{m.map}</span>
                 <span style={{ fontSize: 11, color: '#555', marginRight: 16 }}>{m.wins}W - {m.losses}L</span>

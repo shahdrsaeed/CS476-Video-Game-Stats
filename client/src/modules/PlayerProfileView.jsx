@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, ChevronUp } from 'lucide-react';
 // import { PLAYERS_LIST } from '../data/mockData';
-import { getUser } from '../services/userAPI';
+import { getUser } from '../services/UserApi';
 import Navbar from '../components/Navbar'
 
 // ── Rank color helper ──
@@ -39,7 +39,7 @@ const PlayerProfileView = () => {
           ...raw,
 
           // Fields not yet in DB — show fallback values
-          valorantId: raw.username,
+          valorantId: raw.username, // not in player schema
           team:       raw.teamId ?? 'No Team',
           playtime:   'N/A',
           peakRank:   raw.rank,
@@ -134,7 +134,7 @@ const PlayerProfileView = () => {
             <img src={player.avatar} alt={player.username} style={styles.bannerAvatar} />
             <div>
               <div style={styles.bannerName}>{player.username}</div>
-              <div style={styles.bannerTag}>{player.valorantId}</div>
+              <div style={styles.bannerTag}>{player.valorantId}</div> {/* not in player schema */}
               <div style={styles.bannerMeta}>
                 <span style={styles.metaBadge}>{player.team}</span>
                 <span style={styles.metaBadge}>LVL {player.level}</span>

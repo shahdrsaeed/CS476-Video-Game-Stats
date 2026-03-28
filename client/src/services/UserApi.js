@@ -15,3 +15,7 @@ export const loginUser = (data) => {
 export const getUser = (id) => {
   return axios.get(`/api/users/${id}`);
 };
+
+export const getAllPlayers = (search = '') => {
+  return axios.get(`/api/players${search ? `?search=${search}` : ''}`);
+};

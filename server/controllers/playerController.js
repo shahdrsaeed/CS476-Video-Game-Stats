@@ -71,8 +71,29 @@ const updatePlayer = async (req, res) => {
   }
 };
 
+// Get all players - for team search
+const getAllPlayers = async (req, res) => {
+  try {
+    const { search } = req.query;
+
+    let query = {};
+
+    // if a search term is provided, filter by username
+    if (search) {
+      query.username = { $regex: search, $options: 'i' }; // case-insensitive
+    }
+
+    const players = await Player.find(query).select('-password');
+    res.json(players);
+
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getPlayerStats,
   getPlayerById,
-  updatePlayer
+  updatePlayer,
+  getAllPlayers
 };
