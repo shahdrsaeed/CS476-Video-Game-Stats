@@ -47,8 +47,6 @@ const PlayerSchema = new mongoose.Schema({
     deaths: { type: Number, default: 0, min: 0 },
     assists: { type: Number, default: 0, min: 0 },
 
-    roundsPlayed: { type: Number, default: 0, min: 0 },
-
     wins: { type: Number, default: 0, min: 0 },
     losses: { type: Number, default: 0, min: 0 },
 
@@ -56,9 +54,6 @@ const PlayerSchema = new mongoose.Schema({
     firstDeaths: { type: Number, default: 0, min: 0 },
     aces: { type: Number, default: 0, min: 0 },
     flawlessRounds: { type: Number, default: 0, min: 0 },
-
-    damageDealt: { type: Number, default: 0, min: 0 },
-    damageTaken: { type: Number, default: 0, min: 0 },
     
     headshots: { type: Number, default: 0, min: 0 },
     bodyshots: { type: Number, default: 0, min: 0 },
@@ -151,12 +146,6 @@ PlayerSchema.virtual('winRate').get(function () {
   if (total === 0) return '0.00';
   return ((this.stats.wins / total) * 100).toFixed(2);
 });
-
-// ACS
-PlayerSchema.virtual('acs').get(function () {
-  if (this.stats.roundsPlayed === 0) return '0.00';
-  return (this.stats.damageDealt / this.stats.roundsPlayed).toFixed(2);
-})
 
 // Headshot percentage
 PlayerSchema.virtual('headshotPercentage').get(function () {
