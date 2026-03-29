@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Mail, Lock, ChevronRight, User, Users, AlertCircle } from 'lucide-react';
-import { loginUser } from '../services/UserApi';
 
 // ── Shake keyframe injected once ──
 const shakeStyle = `
@@ -36,15 +35,35 @@ const LoginView = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Basic client-side validation
     try {
-      const res = await loginUser(form);
-      const user = res.data.user;
+      const res = await fetch('/api/users/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, password: form.password })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Login failed');
+      }
+
+      const data = await res.json(); // <-- read JSON from fetch response
+
+      const user = data.user;
+
+      // Store in localStorage
+      localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('userRole', user.role === 'Coach' ? 'coach' : 'player');
+
+      // Navigate based on role
       if (user.role === 'Coach') navigate('/coach');
       else navigate('/player');
+
     } catch (err) {
-      triggerShake(err.response?.data?.error || 'Login failed. Please check your credentials.');
+      triggerShake(err.message);
     }
   };
 
