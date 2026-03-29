@@ -24,11 +24,15 @@ const SignUpView = () => {
   const [form, setForm] = useState({ username: '', email: '', password: '', teamName: '' });
   const [error, setError] = useState('');
   const [shaking, setShaking] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null); 
   const fileInputRef = useRef();
 
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
-    if (file) setAvatarPreview(URL.createObjectURL(file));
+    if (file) {
+      setAvatarPreview(URL.createObjectURL(file));
+      setAvatarFile(file);
+    }
   };
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -39,6 +43,7 @@ const SignUpView = () => {
     setTimeout(() => setShaking(false), 500);
   };
 
+  /*
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -57,6 +62,28 @@ const SignUpView = () => {
       triggerShake(err.response?.data?.message || 'An error occurred during sign up.');
     }
   };
+  */
+  
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
+  try {
+    const formData = new FormData();
+    formData.append('username', form.username);
+    formData.append('email', form.email);
+    formData.append('password', form.password);
+    formData.append('role', role);
+    formData.append('teamName', form.teamName);
+    if (avatarFile) formData.append('avatar', avatarFile); // only appended if they chose a photo
+
+    await createUser(formData); 
+    navigate('/login');
+  } catch (err) {
+    console.log('Full error:', err);
+    console.log('Response data:', err.response?.data);
+    triggerShake(err.response?.data?.message || 'An error occurred during sign up.');
+  }
+};
 
   return (
     <div style={styles.page}>

@@ -131,7 +131,7 @@ const PlayerProfileView = () => {
         {/* ── PROFILE BANNER ── */}
         <div style={styles.profileBanner}>
           <div style={styles.bannerLeft}>
-            <img src={player.avatar} alt={player.username} style={styles.bannerAvatar} />
+            <img src={player.imageURL} alt={player.username} style={styles.bannerAvatar} />
             <div>
               <div style={styles.bannerName}>{player.username}</div>
               <div style={styles.bannerTag}>{player.valorantId}</div> {/* not in player schema */}
