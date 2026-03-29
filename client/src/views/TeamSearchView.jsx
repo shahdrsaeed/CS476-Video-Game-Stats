@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-import { getAllPlayers } from '../services/UserApi'; 
-import { Search, Shield, User, ChevronRight, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
+import { getAllPlayers } from '../services/UserApi';
+import { Search, Shield, User, ChevronRight, ChevronLeft, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
 
-// Get the logged-in user from localStorage
 const loggedInUser = JSON.parse(localStorage.getItem('user'));
 
 const rankColor = (rank) => {
@@ -15,12 +14,19 @@ const rankColor = (rank) => {
   return '#888';
 };
 
-// Request button logic
+// FIX 1: r.player is a populated object { username: '...' } not a plain string
 const getRequestStatus = (playerName, requests = []) => {
-  const found = requests.find(r => r.player === playerName);
+  const found = requests.find(r => r.player?.username === playerName);
   if (!found) return 'none';
-  return found.status; // 'Pending' or 'Approved'
+  return found.status;
 };
+
+const getRequestId = (playerName, requests = []) => {
+  const found = requests.find(r => r.player?.username === playerName);
+  return found?._id ?? null;
+};
+
+const PLAYERS_PER_PAGE = 8;
 
 const TeamSearchView = () => {
   const [query, setQuery] = useState('');
@@ -28,36 +34,27 @@ const TeamSearchView = () => {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [requests, setRequests] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Fetch requests if the user is a coach
   useEffect(() => {
     const fetchRequests = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch('/api/requests', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+        // Filter by coachId so coach only sees their own requests
+        const res = await fetch(`/api/requests?coachId=${loggedInUser._id}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
         });
-
-        if (!res.ok) {
-          throw new Error('Unauthorized');
-        }
-
+        if (!res.ok) throw new Error('Unauthorized');
         const data = await res.json();
         setRequests(data);
       } catch (err) {
         console.error('Failed to fetch requests:', err);
-        setRequests([]); // Ensure requests is always an array
+        setRequests([]);
       }
     };
-
-    if (loggedInUser?.role === 'Coach') {
-      fetchRequests();
-    }
+    if (loggedInUser?.role === 'Coach') fetchRequests();
   }, []);
 
-  // Fetch all players
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
@@ -72,27 +69,23 @@ const TeamSearchView = () => {
     fetchPlayers();
   }, []);
 
+  // Send a new request
   const handleRequest = async (player) => {
     try {
-
-      // Prevent duplicate requests
       const status = getRequestStatus(player.username, requests);
       if (status !== 'none') return;
 
       const token = localStorage.getItem('token');
-
-      const body = {
-        playerId: player._id,
-        teamId: loggedInUser.teamId, // Ensure coach's teamId is properly set
-      };
-
       const res = await fetch(`/api/requests/${loggedInUser._id}/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          playerId: player._id,
+          teamId: loggedInUser.teamId,
+        }),
       });
 
       if (!res.ok) {
@@ -102,14 +95,13 @@ const TeamSearchView = () => {
 
       const newRequest = await res.json();
 
-      // Update local state to show the request in the UI
+      // Store player as { username } object to match getRequestStatus expectations
       setRequests(prev => [
         ...prev,
         {
           _id: newRequest._id,
           player: { username: player.username },
-          team: { teamName: loggedInUser.teamName }, // Coach's team
-          date: new Date().toISOString().split('T')[0],
+          team: { teamName: loggedInUser.teamName },
           status: 'Pending',
         },
       ]);
@@ -118,10 +110,42 @@ const TeamSearchView = () => {
     }
   };
 
-  // Filter players based on search query
+  // FIX 3: Cancel a pending request — calls the existing DELETE /reject endpoint
+  const handleCancel = async (player) => {
+    try {
+      const requestId = getRequestId(player.username, requests);
+      if (!requestId) return;
+
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/requests/${requestId}/reject`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error('Failed to cancel request');
+
+      // Remove from local state — button reverts to REQUEST
+      setRequests(prev => prev.filter(r => r._id !== requestId));
+    } catch (err) {
+      console.error('Failed to cancel request:', err);
+    }
+  };
+
   const filtered = players.filter(p =>
     p.username.toLowerCase().includes(query.toLowerCase())
   );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PLAYERS_PER_PAGE));
+
+  const paginated = filtered.slice(
+    (currentPage - 1) * PLAYERS_PER_PAGE,
+    currentPage * PLAYERS_PER_PAGE
+  );
+
+  const handleSearch = (value) => {
+    setQuery(value);
+    setCurrentPage(1);
+  };
 
   if (loading) return <div style={{ color: '#fff', padding: 40 }}>Loading...</div>;
 
@@ -130,7 +154,6 @@ const TeamSearchView = () => {
       <Navbar />
 
       <div style={styles.body}>
-        {/* Search bar */}
         <div style={styles.searchSection}>
           <h1 style={styles.title}>TEAM SEARCH</h1>
           <p style={styles.subtitle}>Find players and teams across the competitive network</p>
@@ -138,13 +161,13 @@ const TeamSearchView = () => {
             <Search size={18} color="#555" style={{ flexShrink: 0 }} />
             <input
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => handleSearch(e.target.value)}
               placeholder="Search by player name, Valorant ID, or team..."
               style={styles.searchInput}
               autoFocus
             />
             {query && (
-              <button style={styles.clearBtn} onClick={() => setQuery('')}>
+              <button style={styles.clearBtn} onClick={() => handleSearch('')}>
                 <X size={14} />
               </button>
             )}
@@ -154,15 +177,14 @@ const TeamSearchView = () => {
           </div>
         </div>
 
-        {/* Results grid */}
         <div style={styles.grid}>
-          {filtered.length === 0 ? (
+          {paginated.length === 0 ? (
             <div style={styles.empty}>
               <User size={40} color="#333" />
               <p style={{ color: '#444', marginTop: 12, letterSpacing: 2 }}>NO PLAYERS FOUND</p>
             </div>
           ) : (
-            filtered.map(player => (
+            paginated.map(player => (
               <div
                 key={player._id}
                 style={styles.card}
@@ -171,20 +193,15 @@ const TeamSearchView = () => {
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#1a1f2e'}
               >
                 <div style={styles.cardTop}>
-                  { /* Changed this */}
                   <img
                     src={player.imageURL || '/default-avatar.png'}
                     alt={player.username}
                     style={styles.cardAvatar}
-                    onError={(e) => { 
-                      e.target.onerror = null; // prevents looping
-                      e.target.src = '/default-avatar.png'; 
-                    }}
+                    onError={(e) => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }}
                   />
-
                   <div style={{ flex: 1 }}>
                     <div style={styles.cardName}>{player.username}</div>
-                    <div style={styles.cardId}>{player.valorantId}</div> {/* not in player schema */}
+                    <div style={styles.cardId}>{player.valorantId}</div>
                     <div style={{ ...styles.cardRank, color: rankColor(player.rank) }}>
                       {player.rank} · {player.rr} RR
                     </div>
@@ -214,32 +231,70 @@ const TeamSearchView = () => {
             ))
           )}
         </div>
+
+        {totalPages > 1 && (
+          <>
+            <div style={styles.pagination}>
+              <button
+                onClick={() => setCurrentPage(p => p - 1)}
+                disabled={currentPage === 1}
+                style={{
+                  ...styles.pageBtn,
+                  borderColor: currentPage === 1 ? '#1a1f2e' : 'rgba(255,70,85,0.35)',
+                  color: currentPage === 1 ? '#333' : '#ff4655',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <ChevronLeft size={13} /> PREV
+              </button>
+              <span style={styles.pageIndicator}>{currentPage} / {totalPages}</span>
+              <button
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage === totalPages}
+                style={{
+                  ...styles.pageBtn,
+                  borderColor: currentPage === totalPages ? '#1a1f2e' : 'rgba(255,70,85,0.35)',
+                  color: currentPage === totalPages ? '#333' : '#ff4655',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                }}
+              >
+                NEXT <ChevronRight size={13} />
+              </button>
+            </div>
+            <p style={styles.pageInfo}>
+              Showing {filtered.length === 0 ? 0 : (currentPage - 1) * PLAYERS_PER_PAGE + 1}–{Math.min(currentPage * PLAYERS_PER_PAGE, filtered.length)} of {filtered.length} players
+            </p>
+          </>
+        )}
       </div>
 
-      {/* ── Player detail modal ── */}
       {selected && (
         <div style={modal.overlay} onClick={() => setSelected(null)}>
           <div style={modal.box} onClick={e => e.stopPropagation()}>
-
-            {/* Header with Request button */}
             <div style={modal.header}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <img src={selected.avatar} alt={selected.username} style={modal.avatar} />
+                {/* FIX 2: was selected.avatar — correct field is selected.imageURL */}
+                <img
+                  src={selected.imageURL || '/default-avatar.png'}
+                  alt={selected.username}
+                  style={modal.avatar}
+                  onError={(e) => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }}
+                />
                 <div>
                   <div style={modal.name}>{selected.username}</div>
-                  <div style={{ fontSize: 12, color: '#555' }}>{selected.valorantId}</div> {/* not in player schema */}
+                  <div style={{ fontSize: 12, color: '#555' }}>{selected.valorantId}</div>
                   <div style={{ fontSize: 14, fontWeight: 900, color: rankColor(selected.rank), marginTop: 4 }}>
                     {selected.rank} · {selected.rr} RR
                   </div>
                 </div>
               </div>
 
-              {/* ── REQUEST BUTTON (top right) ── */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {JSON.parse(localStorage.getItem('user')).role === 'Coach' && (
+                {loggedInUser?.role === 'Coach' && (
                   <RequestButton
                     status={getRequestStatus(selected.username, requests)}
                     onClick={() => handleRequest(selected)}
+                    onCancel={() => handleCancel(selected)}
                   />
                 )}
                 <button style={modal.closeBtn} onClick={() => setSelected(null)}>
@@ -248,17 +303,16 @@ const TeamSearchView = () => {
               </div>
             </div>
 
-            {/* Stats grid */}
             <div style={modal.statsGrid}>
               {[
-                { label: 'K/D',     value: selected.kdRatio },
-                { label: 'WIN RATE',value: selected.winRate },
-                { label: 'ACS',     value: selected.stats?.acs },
-                { label: 'HS%',     value: selected.headshotPercentage },
-                { label: 'KAST',    value: 'N/A' },
-                { label: 'DMG/RND', value: 'N/A' },
-                { label: 'KILLS',   value: selected.stats?.kills },
-                { label: 'MATCHES', value: (selected.stats?.wins ?? 0) + (selected.stats?.losses ?? 0) },
+                { label: 'K/D',      value: selected.kdRatio },
+                { label: 'WIN RATE', value: selected.winRate },
+                { label: 'ACS',      value: selected.stats?.acs },
+                { label: 'HS%',      value: selected.headshotPercentage },
+                { label: 'KAST',     value: 'N/A' },
+                { label: 'DMG/RND',  value: 'N/A' },
+                { label: 'KILLS',    value: selected.stats?.kills },
+                { label: 'MATCHES',  value: (selected.stats?.wins ?? 0) + (selected.stats?.losses ?? 0) },
               ].map(s => (
                 <div key={s.label} style={modal.statBox}>
                   <div style={{ fontSize: 10, color: '#555', letterSpacing: 1 }}>{s.label}</div>
@@ -267,7 +321,6 @@ const TeamSearchView = () => {
               ))}
             </div>
 
-            {/* Top agents */}
             <div style={modal.sectionTitle}><User size={12} color="#ff4655" style={{ marginRight: 6 }} />TOP AGENTS</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
               <thead>
@@ -286,7 +339,6 @@ const TeamSearchView = () => {
               </tbody>
             </table>
 
-            {/* Top maps */}
             <div style={modal.sectionTitle}><Shield size={12} color="#ff4655" style={{ marginRight: 6 }} />TOP MAPS</div>
             {(selected.topMaps ?? []).map(m => (
               <div key={m.map} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', padding: '8px 0' }}>
@@ -302,8 +354,10 @@ const TeamSearchView = () => {
   );
 };
 
-// ── Request Button Component ──────────────────────────────
-const RequestButton = ({ status, onClick }) => {
+// FIX 3: PENDING button is now clickable — hovering shows CANCEL state
+const RequestButton = ({ status, onClick, onCancel }) => {
+  const [hovering, setHovering] = useState(false);
+
   if (status === 'Approved') {
     return (
       <div style={{ ...reqBtn.base, ...reqBtn.approved }}>
@@ -311,13 +365,23 @@ const RequestButton = ({ status, onClick }) => {
       </div>
     );
   }
+
   if (status === 'Pending') {
     return (
-      <div style={{ ...reqBtn.base, ...reqBtn.pending }}>
-        <Clock size={13} style={{ marginRight: 6 }} /> PENDING
-      </div>
+      <button
+        style={{ ...reqBtn.base, ...(hovering ? reqBtn.cancel : reqBtn.pending), cursor: 'pointer' }}
+        onClick={onCancel}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+      >
+        {hovering
+          ? <><X size={13} style={{ marginRight: 6 }} /> CANCEL</>
+          : <><Clock size={13} style={{ marginRight: 6 }} /> PENDING</>
+        }
+      </button>
     );
   }
+
   return (
     <button style={{ ...reqBtn.base, ...reqBtn.request }} onClick={onClick}>
       <UserPlus size={13} style={{ marginRight: 6 }} /> REQUEST
@@ -333,25 +397,12 @@ const reqBtn = {
     fontFamily: "'Barlow Condensed', sans-serif",
     cursor: 'default', border: 'none',
   },
-  request: {
-    background: 'rgba(255,70,85,0.15)',
-    border: '1px solid rgba(255,70,85,0.35)',
-    color: '#ff4655',
-    cursor: 'pointer',
-  },
-  pending: {
-    background: 'rgba(245,158,11,0.1)',
-    border: '1px solid rgba(245,158,11,0.3)',
-    color: '#f59e0b',
-  },
-  approved: {
-    background: 'rgba(34,197,94,0.1)',
-    border: '1px solid rgba(34,197,94,0.3)',
-    color: '#22c55e',
-  },
+  request:  { background: 'rgba(255,70,85,0.15)',  border: '1px solid rgba(255,70,85,0.35)',  color: '#ff4655', cursor: 'pointer' },
+  pending:  { background: 'rgba(245,158,11,0.1)',  border: '1px solid rgba(245,158,11,0.3)',  color: '#f59e0b' },
+  cancel:   { background: 'rgba(255,70,85,0.1)',   border: '1px solid rgba(255,70,85,0.35)',  color: '#ff4655' },
+  approved: { background: 'rgba(34,197,94,0.1)',   border: '1px solid rgba(34,197,94,0.3)',   color: '#22c55e' },
 };
 
-// ── Styles ────────────────────────────────────────────────
 const styles = {
   page: { minHeight: '100vh', backgroundColor: '#0a0d14', fontFamily: "'Barlow Condensed', 'Arial Narrow', sans-serif", color: '#ccc' },
   body: { padding: '40px 40px' },
@@ -376,6 +427,10 @@ const styles = {
   statLabel: { fontSize: 9, color: '#555', letterSpacing: 1, marginBottom: 3 },
   statValue: { fontSize: 14, fontWeight: 900, color: '#fff' },
   viewBtn: { width: '100%', background: 'rgba(255,70,85,0.1)', border: '1px solid rgba(255,70,85,0.25)', color: '#ff4655', borderRadius: 6, padding: '8px 0', fontSize: 12, fontWeight: 700, letterSpacing: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Barlow Condensed', sans-serif" },
+  pagination: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 32 },
+  pageBtn: { display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: '1px solid', borderRadius: 6, padding: '8px 16px', fontSize: 12, fontWeight: 700, letterSpacing: 2, fontFamily: "'Barlow Condensed', sans-serif" },
+  pageIndicator: { fontSize: 12, color: '#555', letterSpacing: 2 },
+  pageInfo: { textAlign: 'center', fontSize: 11, color: '#333', letterSpacing: 1, marginTop: 10 },
 };
 
 const modal = {
