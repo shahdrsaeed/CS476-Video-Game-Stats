@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-// import { PLAYERS_LIST } from '../data/mockData';
 import { getAllPlayers } from '../services/UserApi'; 
 import { Search, Shield, User, ChevronRight, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
+
+// Get the logged-in user from localStorage
+const loggedInUser = JSON.parse(localStorage.getItem('user'));
 
 const rankColor = (rank) => {
   if (!rank) return '#888';
@@ -13,32 +15,49 @@ const rankColor = (rank) => {
   return '#888';
 };
 
-// ── Request button logic ──────────────────────────────────
-const getRequestStatus = (playerName, requests) => {
+// Request button logic
+const getRequestStatus = (playerName, requests = []) => {
   const found = requests.find(r => r.player === playerName);
   if (!found) return 'none';
   return found.status; // 'Pending' or 'Approved'
 };
 
 const TeamSearchView = () => {
-  const [query, setQuery]       = useState('');
-  const [players, setPlayers]   = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [query, setQuery] = useState('');
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [requests, setRequests] = useState([]);
 
-  // Load requests from localStorage on mount
+  // Fetch requests if the user is a coach
   useEffect(() => {
-    const stored = localStorage.getItem('registrationRequests');
-    if (stored) setRequests(JSON.parse(stored));
+    const fetchRequests = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/requests', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error('Unauthorized');
+        }
+
+        const data = await res.json();
+        setRequests(data);
+      } catch (err) {
+        console.error('Failed to fetch requests:', err);
+        setRequests([]); // Ensure requests is always an array
+      }
+    };
+
+    if (loggedInUser?.role === 'Coach') {
+      fetchRequests();
+    }
   }, []);
 
-  // Save to localStorage whenever requests change
-  useEffect(() => {
-    localStorage.setItem('registrationRequests', JSON.stringify(requests));
-  }, [requests]);
-
-  // Fetch all players on mount
+  // Fetch all players
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
@@ -53,21 +72,53 @@ const TeamSearchView = () => {
     fetchPlayers();
   }, []);
 
-  const handleRequest = (player) => {
-    const status = getRequestStatus(player.username, requests);
-    if (status !== 'none') return; // already requested
+  const handleRequest = async (player) => {
+    try {
 
-    const newRequest = {
-      id: Date.now(),
-      player: player.username,
-      team: player.teamId ?? 'No Team',
-      date: new Date().toISOString().split('T')[0],
-      status: 'Pending',
-    };
-    setRequests(prev => [...prev, newRequest]);
+      // Prevent duplicate requests
+      const status = getRequestStatus(player.username, requests);
+      if (status !== 'none') return;
+
+      const token = localStorage.getItem('token');
+
+      const body = {
+        playerId: player._id,
+        teamId: loggedInUser.teamId, // Ensure coach's teamId is properly set
+      };
+
+      const res = await fetch(`/api/requests/${loggedInUser._id}/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to send request');
+      }
+
+      const newRequest = await res.json();
+
+      // Update local state to show the request in the UI
+      setRequests(prev => [
+        ...prev,
+        {
+          _id: newRequest._id,
+          player: { username: player.username },
+          team: { teamName: loggedInUser.teamName }, // Coach's team
+          date: new Date().toISOString().split('T')[0],
+          status: 'Pending',
+        },
+      ]);
+    } catch (err) {
+      console.error('Failed to send request:', err);
+    }
   };
 
-   // Filter locally by username
+  // Filter players based on search query
   const filtered = players.filter(p =>
     p.username.toLowerCase().includes(query.toLowerCase())
   );
@@ -185,10 +236,12 @@ const TeamSearchView = () => {
 
               {/* ── REQUEST BUTTON (top right) ── */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <RequestButton
-                  status={getRequestStatus(selected.username, requests)}
-                  onClick={() => handleRequest(selected)}
-                />
+                {JSON.parse(localStorage.getItem('user')).role === 'Coach' && (
+                  <RequestButton
+                    status={getRequestStatus(selected.username, requests)}
+                    onClick={() => handleRequest(selected)}
+                  />
+                )}
                 <button style={modal.closeBtn} onClick={() => setSelected(null)}>
                   <X size={16} />
                 </button>

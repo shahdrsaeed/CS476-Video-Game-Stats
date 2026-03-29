@@ -1,4 +1,4 @@
-const Map = require('../models/Map');
+const Map = require('../models/submodel/Map');
 
 /**
  * GET all maps
