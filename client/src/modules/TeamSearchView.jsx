@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-// import { PLAYERS_LIST } from '../data/mockData';
 import { getAllPlayers } from '../services/UserApi'; 
 import { Search, Shield, User, ChevronRight, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
+
+// Get the logged-in user from localStorage
+const loggedInUser = JSON.parse(localStorage.getItem('user'));
 
 const rankColor = (rank) => {
   if (!rank) return '#888';
@@ -13,32 +15,49 @@ const rankColor = (rank) => {
   return '#888';
 };
 
-// ── Request button logic ──────────────────────────────────
-const getRequestStatus = (playerName, requests) => {
+// Request button logic
+const getRequestStatus = (playerName, requests = []) => {
   const found = requests.find(r => r.player === playerName);
   if (!found) return 'none';
   return found.status; // 'Pending' or 'Approved'
 };
 
 const TeamSearchView = () => {
-  const [query, setQuery]       = useState('');
-  const [players, setPlayers]   = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [query, setQuery] = useState('');
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [requests, setRequests] = useState([]);
 
-  // Load requests from localStorage on mount
+  // Fetch requests if the user is a coach
   useEffect(() => {
-    const stored = localStorage.getItem('registrationRequests');
-    if (stored) setRequests(JSON.parse(stored));
+    const fetchRequests = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/requests', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error('Unauthorized');
+        }
+
+        const data = await res.json();
+        setRequests(data);
+      } catch (err) {
+        console.error('Failed to fetch requests:', err);
+        setRequests([]); // Ensure requests is always an array
+      }
+    };
+
+    if (loggedInUser?.role === 'Coach') {
+      fetchRequests();
+    }
   }, []);
 
-  // Save to localStorage whenever requests change
-  useEffect(() => {
-    localStorage.setItem('registrationRequests', JSON.stringify(requests));
-  }, [requests]);
-
-  // Fetch all players on mount
+  // Fetch all players
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
@@ -53,21 +72,53 @@ const TeamSearchView = () => {
     fetchPlayers();
   }, []);
 
-  const handleRequest = (player) => {
-    const status = getRequestStatus(player.username, requests);
-    if (status !== 'none') return; // already requested
+  const handleRequest = async (player) => {
+    try {
 
-    const newRequest = {
-      id: Date.now(),
-      player: player.username,
-      team: player.teamId ?? 'No Team',
-      date: new Date().toISOString().split('T')[0],
-      status: 'Pending',
-    };
-    setRequests(prev => [...prev, newRequest]);
+      // Prevent duplicate requests
+      const status = getRequestStatus(player.username, requests);
+      if (status !== 'none') return;
+
+      const token = localStorage.getItem('token');
+
+      const body = {
+        playerId: player._id,
+        teamId: loggedInUser.teamId, // Ensure coach's teamId is properly set
+      };
+
+      const res = await fetch(`/api/requests/${loggedInUser._id}/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to send request');
+      }
+
+      const newRequest = await res.json();
+
+      // Update local state to show the request in the UI
+      setRequests(prev => [
+        ...prev,
+        {
+          _id: newRequest._id,
+          player: { username: player.username },
+          team: { teamName: loggedInUser.teamName }, // Coach's team
+          date: new Date().toISOString().split('T')[0],
+          status: 'Pending',
+        },
+      ]);
+    } catch (err) {
+      console.error('Failed to send request:', err);
+    }
   };
 
-   // Filter locally by username
+  // Filter players based on search query
   const filtered = players.filter(p =>
     p.username.toLowerCase().includes(query.toLowerCase())
   );
@@ -123,7 +174,7 @@ const TeamSearchView = () => {
                   <img src={player.imageURL} alt={player.username} style={styles.cardAvatar} />
                   <div style={{ flex: 1 }}>
                     <div style={styles.cardName}>{player.username}</div>
-                    <div style={styles.cardId}>{player.valorantId}</div> {/* not in player schema */}
+                    <div style={styles.cardId}>{player.valorantId}</div>
                     <div style={{ ...styles.cardRank, color: rankColor(player.rank) }}>
                       {player.rank} · {player.rr} RR
                     </div>
@@ -134,17 +185,16 @@ const TeamSearchView = () => {
                   {player.teamId ?? 'No Team'}
                 </div>
                 <div style={styles.cardStats}>
-                  {[
-                    { label: 'K/D',  value: player.kdRatio },
+                  {[{ label: 'K/D', value: player.kdRatio },
                     { label: 'WIN%', value: player.winRate },
-                    { label: 'ACS',  value: player.stats?.acs },
-                    { label: 'HS%',  value: player.headshotPercentage },
-                  ].map(s => (
-                    <div key={s.label} style={styles.statItem}>
-                      <div style={styles.statLabel}>{s.label}</div>
-                      <div style={styles.statValue}>{s.value}</div>
-                    </div>
-                  ))}
+                    { label: 'ACS', value: player.stats?.acs },
+                    { label: 'HS%', value: player.headshotPercentage }]
+                    .map(s => (
+                      <div key={s.label} style={styles.statItem}>
+                        <div style={styles.statLabel}>{s.label}</div>
+                        <div style={styles.statValue}>{s.value}</div>
+                      </div>
+                    ))}
                 </div>
                 <button style={styles.viewBtn}>
                   VIEW PROFILE <ChevronRight size={12} style={{ marginLeft: 4 }} />
@@ -166,7 +216,7 @@ const TeamSearchView = () => {
                 <img src={selected.avatar} alt={selected.username} style={modal.avatar} />
                 <div>
                   <div style={modal.name}>{selected.username}</div>
-                  <div style={{ fontSize: 12, color: '#555' }}>{selected.valorantId}</div> {/* not in player schema */}
+                  <div style={{ fontSize: 12, color: '#555' }}>{selected.valorantId}</div>
                   <div style={{ fontSize: 14, fontWeight: 900, color: rankColor(selected.rank), marginTop: 4 }}>
                     {selected.rank} · {selected.rr} RR
                   </div>
@@ -174,34 +224,29 @@ const TeamSearchView = () => {
               </div>
 
               {/* ── REQUEST BUTTON (top right) ── */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {JSON.parse(localStorage.getItem('user')).role === 'Coach' && (
                 <RequestButton
                   status={getRequestStatus(selected.username, requests)}
                   onClick={() => handleRequest(selected)}
                 />
-                <button style={modal.closeBtn} onClick={() => setSelected(null)}>
-                  <X size={16} />
-                </button>
-              </div>
+              )}
+              <button style={modal.closeBtn} onClick={() => setSelected(null)}>
+                <X size={16} />
+              </button>
             </div>
 
             {/* Stats grid */}
             <div style={modal.statsGrid}>
-              {[
-                { label: 'K/D',     value: selected.kdRatio },
-                { label: 'WIN RATE',value: selected.winRate },
-                { label: 'ACS',     value: selected.stats?.acs },
-                { label: 'HS%',     value: selected.headshotPercentage },
-                { label: 'KAST',    value: 'N/A' },
-                { label: 'DMG/RND', value: 'N/A' },
-                { label: 'KILLS',   value: selected.stats?.kills },
-                { label: 'MATCHES', value: (selected.stats?.wins ?? 0) + (selected.stats?.losses ?? 0) },
-              ].map(s => (
-                <div key={s.label} style={modal.statBox}>
-                  <div style={{ fontSize: 10, color: '#555', letterSpacing: 1 }}>{s.label}</div>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: '#fff' }}>{s.value}</div>
-                </div>
-              ))}
+              {[{ label: 'K/D', value: selected.kdRatio },
+                { label: 'WIN RATE', value: selected.winRate },
+                { label: 'ACS', value: selected.stats?.acs },
+                { label: 'HS%', value: selected.headshotPercentage }]
+                .map(s => (
+                  <div key={s.label} style={modal.statBox}>
+                    <div style={{ fontSize: 10, color: '#555', letterSpacing: 1 }}>{s.label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: '#fff' }}>{s.value}</div>
+                  </div>
+                ))}
             </div>
 
             {/* Top agents */}

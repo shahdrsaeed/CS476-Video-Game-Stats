@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const auth = require('../middleware/auth');
 const { 
     sendRequest,
     approveRequest,
@@ -8,8 +9,8 @@ const {
  } = require('../controllers/requestController');
 
 router.post('/:coachId/send', sendRequest);
-router.post('/:id/approve', approveRequest);
-router.post('/:id/reject', rejectRequest);
-router.get('/', getRequests);
+router.put('/:id/approve', approveRequest);
+router.delete('/:id/reject', rejectRequest);
+router.get('/', auth, getRequests);
 
 module.exports = router;

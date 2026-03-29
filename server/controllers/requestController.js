@@ -1,43 +1,55 @@
 const Request = require('../models/Request');
 const Player = require('../models/Player');
+const Team = require('../models/Team');
+const jwt = require('jsonwebtoken');
 
-// Send a request to join a team
 const sendRequest = async (req, res) => {
-    try {
-        const { playerId, teamId } = req.body;
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Unauthorized' });
 
-        const request = new Request({
-            player: playerId,
-            team: teamId,
-            coach: null, // Coach will be assigned when the request is approved
-        });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const coachId = decoded.id;
 
-        await request.save();
+    const { playerId, teamId } = req.body;
 
-        res.status(201).json(request);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
+    const request = new Request({
+      player: playerId,
+      team: teamId,
+      coach: coachId,  // assign coach from token
+      status: 'Pending'
+    });
+
+    await request.save();
+    res.status(201).json(request);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
 
-// Approve a request to join a team
+    // Approve a request to join a team
 const approveRequest = async (req, res) => {
     try{
         const request = await Request.findById(req.params.id);
-
         if (!request){
-             return res.status(404).json({ message: 'Request not found' });
+            return res.status(404).json({ message: 'Request not found' });
         }
-
+        
         request.status = 'Approved';
         await request.save();
 
-        await Player.findByIdAndUpdate(request.player, { 
+        // Assign player to coach and team
+        await Player.findByIdAndUpdate(request.player, {
             coach: request.coach,
-            team: request.team 
+            teamId: request.team
         });
 
-        res.status(200).json(request);
+        // Add player to team's players array if not already there
+        await Team.findByIdAndUpdate(request.team, {
+        $addToSet: { players: request.player }
+        });
+
+        res.status(200).json({ message: 'Request approved', request });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -47,19 +59,30 @@ const approveRequest = async (req, res) => {
 const rejectRequest = async (req, res) => {
     try{
         const request = await Request.findById(req.params.id);
-        res.json({ message: 'Request rejected' });
+        if (!request) {
+        return res.status(404).json({ message: 'Request not found' });
+        }
+
+        await Request.findByIdAndDelete(req.params.id);
+        res.status(200).json({ message: 'Request rejected' });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 };
 
-// Get all requests for a team
+// Get all requests (optionally filter by coach or team)
 const getRequests = async (req, res) => {
     try {
-        const requests = await Request.find()
+        const { coachId, teamId } = req.query;
+        let query = {};
+
+        if (coachId) query.coach = coachId;
+        if (teamId) query.team = teamId;
+
+        const requests = await Request.find(query)
             .populate('player', 'username')
-            .populate('team', 'name')
-            .populate('coach', 'username')
+            .populate('team', 'teamName')
+            .populate('coach', 'username');
 
         res.status(200).json(requests);
     } catch (err) {

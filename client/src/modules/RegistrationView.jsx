@@ -5,31 +5,57 @@ import { Check, X } from 'lucide-react';
 
 const RegistrationView = () => {
   const [requests, setRequests] = useState([]);
+  const token = localStorage.getItem('token');
 
-  // Load from localStorage on mount
+  // Fetch requests from API on mount
   useEffect(() => {
-    const stored = localStorage.getItem('registrationRequests');
-    if (stored) setRequests(JSON.parse(stored));
+    const fetchRequests = async () => {
+      try {
+        const res = await fetch('/api/requests', {
+          headers: { 
+            'Authorization': `Bearer ${token}` 
+          }
+        });
+        const data = await res.json();
+        setRequests(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchRequests();
   }, []);
 
-  // Save back to localStorage whenever requests change
-  const saveRequests = (updated) => {
-    setRequests(updated);
-    localStorage.setItem('registrationRequests', JSON.stringify(updated));
+  // Approve done via API call
+  const handleApprove = async (id) => {
+    try {
+      await fetch(`/api/requests/${id}/approve`, {
+        method: 'PUT'
+      });
+
+      // update UI
+      setRequests(prev =>
+        prev.map(r =>
+          r._id === id ? { ...r, status: 'Approved' } : r
+        )
+      );
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleApprove = (id) => {
-    const updated = requests.map(r =>
-      r.id === id ? { ...r, status: 'Approved' } : r
-    );
-    saveRequests(updated);
-  };
+  // Reject done via API call
+  const handleReject = async (id) => {
+    try {
+      await fetch(`/api/requests/${id}/reject`, {
+        method: 'DELETE'
+      });
 
-  const handleReject = (id) => {
-    const updated = requests.filter(r => r.id !== id);
-    saveRequests(updated);
+      setRequests(prev => prev.filter(r => r._id !== id));
+    } catch (err) {
+      console.error(err);
+    }
   };
-
   return (
     <div className={styles.container}>
       <Navbar />
@@ -52,9 +78,9 @@ const RegistrationView = () => {
             </thead>
             <tbody>
               {requests.map((req) => (
-                <tr key={req.id}>
-                  <td className={styles.teamName}>{req.player}</td>
-                  <td style={{ color: '#666' }}>{req.team}</td>
+                <tr key={req._id}>
+                  <td className={styles.teamName}>{req.player.username}</td>
+                  <td style={{ color: '#666' }}>{req.team.teamName}</td>
                   <td style={{ fontSize: '12px' }}>{req.date}</td>
                   <td>
                     <span className={styles.winRate} style={{
@@ -69,14 +95,14 @@ const RegistrationView = () => {
                       {req.status !== 'Approved' && (
                         <button
                           style={{ background: '#22c55e', border: 'none', borderRadius: '4px', padding: '5px', cursor: 'pointer' }}
-                          onClick={() => handleApprove(req.id)}
+                          onClick={() => handleApprove(req._id)}
                         >
                           <Check size={16} color="white" />
                         </button>
                       )}
                       <button
                         style={{ background: '#ff4655', border: 'none', borderRadius: '4px', padding: '5px', cursor: 'pointer' }}
-                        onClick={() => handleReject(req.id)}
+                        onClick={() => handleReject(req._id)}
                       >
                         <X size={16} color="white" />
                       </button>
