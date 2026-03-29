@@ -101,3 +101,5 @@ const applyMatchToPlayers = async (match) => {
         await player.save({session}); // session included so write is scoped into transaction
     }
 };
+
+module.exports = { createMatch, getMatch, applyMatchToPlayers };
