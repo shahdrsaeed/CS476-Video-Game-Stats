@@ -120,7 +120,17 @@ const TeamSearchView = () => {
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#1a1f2e'}
               >
                 <div style={styles.cardTop}>
-                  <img src={player.imageURL} alt={player.username} style={styles.cardAvatar} />
+                  { /* Changed this */}
+                  <img
+                    src={player.imageURL || '/default-avatar.png'}
+                    alt={player.username}
+                    style={styles.cardAvatar}
+                    onError={(e) => { 
+                      e.target.onerror = null; // prevents looping
+                      e.target.src = '/default-avatar.png'; 
+                    }}
+                  />
+
                   <div style={{ flex: 1 }}>
                     <div style={styles.cardName}>{player.username}</div>
                     <div style={styles.cardId}>{player.valorantId}</div> {/* not in player schema */}

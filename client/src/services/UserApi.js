@@ -1,10 +1,12 @@
 import axios from 'axios';
 
+// Modified this function
 export const createUser = (data) => {
+  const isFormData = data instanceof FormData;
   return axios.post('/api/users/create', data, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: isFormData
+      ? { 'Content-Type': 'multipart/form-data' }
+      : { 'Content-Type': 'application/json' },
   });
 };
 

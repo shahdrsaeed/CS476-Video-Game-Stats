@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, ChevronUp } from 'lucide-react';
+import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'; // added RefreshCw
 // import { PLAYERS_LIST } from '../data/mockData';
 import { getUser } from '../services/UserApi';
 import Navbar from '../components/Navbar'
@@ -23,6 +23,48 @@ const PlayerProfileView = () => {
   const [player, setPlayer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedMatch, setExpandedMatch] = useState(null);
+
+  const [justUpdated, setJustUpdated] = useState(false);
+const [spinning, setSpinning] = useState(false);
+
+const maps = ['Haven', 'Pearl', 'Bind', 'Abyss', 'Split', 'Breeze', 'Corrode'];
+const placements = ['MVP', '2nd', '3rd', '4th', '5th'];
+const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+// added this
+const generateFakeMatch = () => {
+    const kills = rand(10, 35);
+    const deaths = rand(8, 25);
+    const assists = rand(2, 12);
+    const result = Math.random() > 0.4 ? 'W' : 'L';
+    const score = result === 'W' ? `13:${rand(0, 10)}` : `${rand(5, 12)}:13`;
+    return {
+      date: 'Today',
+      map: maps[rand(0, maps.length - 1)],
+      result,
+      score,
+      kd: parseFloat((kills / deaths).toFixed(1)),
+      kda: `${kills}/${deaths}/${assists}`,
+      ddDelta: rand(-50, 150),
+      hs: rand(20, 55),
+      acs: rand(180, 450),
+      placement: placements[rand(0, placements.length - 1)],
+    };
+  };
+
+  const handleSimulateMatch = () => {
+    setSpinning(true);
+    setTimeout(() => {
+      const newMatch = generateFakeMatch();
+      setPlayer(prev => ({
+        ...prev,
+        recentMatches: [newMatch, ...(prev.recentMatches ?? []).slice(0, 19)],
+      }));
+      setSpinning(false);
+      setJustUpdated(true);
+      setTimeout(() => setJustUpdated(false), 2500);
+    }, 800);
+  };
 
   useEffect(() => {
     const fetchPlayer = async () => {
@@ -131,7 +173,16 @@ const PlayerProfileView = () => {
         {/* ── PROFILE BANNER ── */}
         <div style={styles.profileBanner}>
           <div style={styles.bannerLeft}>
-            <img src={player.avatar} alt={player.username} style={styles.bannerAvatar} />
+            {/* Changed this */}
+            <img
+              src={player.imageURL || '/default-avatar.png'}
+              alt={player.username}
+              style={styles.bannerAvatar}
+              onError={(e) => { 
+                e.target.onerror = null; // prevents looping
+                e.target.src = '/default-avatar.png'; 
+              }}
+            />
             <div>
               <div style={styles.bannerName}>{player.username}</div>
               <div style={styles.bannerTag}>{player.valorantId}</div> {/* not in player schema */}
@@ -319,8 +370,28 @@ const PlayerProfileView = () => {
             </tbody>
           </table>
         </div>
-
+      
+        {/* ── SIMULATE MATCH BUTTON ── */} {/* ADDED THIS*/}
+        <div style={styles.simulateSection}>
+          {justUpdated && (
+            <div style={styles.successMsg}>✓ Match simulated — stats updated!</div>
+          )}
+          <button
+            style={{ ...styles.simulateBtn, opacity: spinning ? 0.7 : 1 }}
+            onClick={handleSimulateMatch}
+            disabled={spinning}
+          >
+            <RefreshCw size={15} style={{ marginRight: 8, animation: spinning ? 'spin 0.8s linear infinite' : 'none' }} />
+            {spinning ? 'SIMULATING MATCH...' : 'SIMULATE NEW MATCH'}
+          </button>
+          <p style={styles.simulateNote}>Dev tool — simulates a completed match and updates all stats</p>
+        </div>
       </div>
+
+    {/* ADDED THIS*/}
+      <style>{`
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 };
@@ -414,6 +485,13 @@ body: { padding: '28px 40px' },
   matchTh: { fontSize: 10, color: '#555', letterSpacing: 1, textAlign: 'left', paddingBottom: 10, fontWeight: 700 },
   matchTd: { fontSize: 13, color: '#888', padding: '10px 0', borderBottom: '1px solid #1a1f2e' },
   matchRow: { transition: 'background 0.15s' },
+
+  // added this
+  simulateSection: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0 20px', gap: 10 },
+  successMsg: { fontSize: 13, color: '#22c55e', letterSpacing: 2, fontWeight: 700 },
+  simulateBtn: { display: 'flex', alignItems: 'center', background: 'rgba(255,70,85,0.1)', border: '1px solid rgba(255,70,85,0.3)', color: '#ff4655', borderRadius: 8, padding: '12px 28px', fontSize: 13, fontWeight: 900, letterSpacing: 2, cursor: 'pointer', fontFamily: "'Barlow Condensed', sans-serif", transition: 'background 0.2s' },
+  simulateNote: { fontSize: 11, color: '#333', letterSpacing: 1 },
+  statCardFlash: { borderColor: '#ff4655' },
 };
 
 export default PlayerProfileView;
