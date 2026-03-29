@@ -173,7 +173,16 @@ const generateFakeMatch = () => {
         {/* ── PROFILE BANNER ── */}
         <div style={styles.profileBanner}>
           <div style={styles.bannerLeft}>
-            <img src={player.imageURL} alt={player.username} style={styles.bannerAvatar} />
+            {/* Changed this */}
+            <img
+              src={player.imageURL || '/default-avatar.png'}
+              alt={player.username}
+              style={styles.bannerAvatar}
+              onError={(e) => { 
+                e.target.onerror = null; // prevents looping
+                e.target.src = '/default-avatar.png'; 
+              }}
+            />
             <div>
               <div style={styles.bannerName}>{player.username}</div>
               <div style={styles.bannerTag}>{player.valorantId}</div> {/* not in player schema */}
