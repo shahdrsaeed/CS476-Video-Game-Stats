@@ -15,7 +15,10 @@ const getPlayerStats = async (req, res) => {
     const player = await Player.findById(id)
       .populate({
         path: 'last20Matches.match',
-        select: 'rounds players',
+        select: 'rounds players map',
+        populate: {
+          path: 'players.agent players.weapon map'
+        }
       });
 
     if (!player) return res.status(404).json({ message: 'Player not found' });
