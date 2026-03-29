@@ -24,9 +24,10 @@ const SignUpView = () => {
   const [form, setForm] = useState({ username: '', email: '', password: '', teamName: '' });
   const [error, setError] = useState('');
   const [shaking, setShaking] = useState(false);
-  const [avatarFile, setAvatarFile] = useState(null); 
+  const [avatarFile, setAvatarFile] = useState(null); // added this
   const fileInputRef = useRef();
 
+  // changed this
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -43,47 +44,25 @@ const SignUpView = () => {
     setTimeout(() => setShaking(false), 500);
   };
 
-  /*
+  // changed this
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      const data = {
-        username: form.username,
-        email: form.email,
-        password: form.password,
-        role: role,
-        teamName: form.teamName,
-        imageURL: ' ',
-      };
-      await createUser(data);
+      const formData = new FormData();
+      formData.append('username', form.username);
+      formData.append('email', form.email);
+      formData.append('password', form.password);
+      formData.append('role', role);
+      formData.append('teamName', form.teamName);
+      if (avatarFile) formData.append('avatar', avatarFile);
+
+      await createUser(formData);
       navigate('/login');
     } catch (err) {
       triggerShake(err.response?.data?.message || 'An error occurred during sign up.');
     }
   };
-  */
-  
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
-  try {
-    const formData = new FormData();
-    formData.append('username', form.username);
-    formData.append('email', form.email);
-    formData.append('password', form.password);
-    formData.append('role', role);
-    formData.append('teamName', form.teamName);
-    if (avatarFile) formData.append('avatar', avatarFile); // only appended if they chose a photo
-
-    await createUser(formData); 
-    navigate('/login');
-  } catch (err) {
-    console.log('Full error:', err);
-    console.log('Response data:', err.response?.data);
-    triggerShake(err.response?.data?.message || 'An error occurred during sign up.');
-  }
-};
 
   return (
     <div style={styles.page}>
