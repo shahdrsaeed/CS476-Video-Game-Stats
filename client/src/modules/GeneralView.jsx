@@ -118,14 +118,18 @@ const GeneralView = () => {
 
       <div className={styles.mainGrid}>
 
-        {/* ── COACH PROFILE CARD ── */}
+        {/* ── COACH PROFILE CARD ── CHANGED*/}
         <div className={styles.profileCard}>
           <div className={styles.profileAvatarLarge}>
-            {coach.imageURL
-              ? <img src={coach.imageURL} alt="Avatar" />
-              : <User size={80} color="#333" />
-            }
-          </div>
+            <img
+              src={coach.imageURL || '/default-avatar.png'}
+              alt={coach.username}
+              onError={(e) => { 
+                e.target.onerror = null; // prevents looping
+                e.target.src = '/default-avatar.png'; 
+              }}
+            />
+          </div> 
 
           <h1 className={styles.profileName}>{coach.username ?? 'Unknown Coach'}</h1>
 
