@@ -19,6 +19,7 @@ const coachRoutes = require('./routes/coachRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const mapRoutes = require('./routes/mapRoutes');
 const matchRoutes = require('./routes/matchRoutes');
+const requestRoutes = require('./routes/requestRoutes');
 
 app.use('/api/players', playerRoutes);
 app.use('/api/users', userRoutes);
@@ -26,5 +27,6 @@ app.use('/api/coach', coachRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/maps', mapRoutes);
 app.use('/api/matches', matchRoutes);
+app.use('/api/requests', requestRoutes);
 
 module.exports = app;
