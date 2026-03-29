@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import SignUpView from './modules/SignUpView'
-import LoginView from './modules/LoginView'
-import PlayerProfileView from './modules/PlayerProfileView'
-import CoachDashboardView from './modules/CoachDashboardView'
-import GeneralView from './modules/GeneralView'
-import RegistrationView from './modules/RegistrationView'
-import TeamSearchView from './modules/TeamSearchView'
+import SignUpView from './views/SignUpView'
+import LoginView from './views/LoginView'
+import PlayerProfileView from './views/PlayerProfileView'
+import CoachDashboardView from './views/CoachDashboardView'
+import GeneralView from './views/GeneralView'
+import RegistrationView from './views/RegistrationView'
+import TeamSearchView from './views/TeamSearchView'
 
 function App() {
   return (
