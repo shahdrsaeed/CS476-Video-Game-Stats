@@ -1,15 +1,11 @@
-const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinaryModule = require('cloudinary');
+const CloudinaryStorage = require('multer-storage-cloudinary');
 const multer = require('multer');
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// no config() call needed — SDK reads CLOUDINARY_URL from .env automatically
 
 const storage = new CloudinaryStorage({
-  cloudinary,
+  cloudinary: cloudinaryModule,
   params: {
     folder: 'videogamestats/profiles',
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
@@ -17,4 +13,4 @@ const storage = new CloudinaryStorage({
   },
 });
 
-module.exports = { cloudinary, upload: multer({ storage }) };
+module.exports = { cloudinary: cloudinaryModule.v2, upload: multer({ storage }) };

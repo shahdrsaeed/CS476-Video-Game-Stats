@@ -7,8 +7,7 @@ const bcrypt = require('bcrypt');
 exports.create = async (req, res) => {
   try {
     const { username, email, password, role, ...rest } = req.body;
-    const imageURL = req.file ? req.file.path : ''; // added this line
-
+   const imageURL = req.file ? req.file.secure_url : ''; // added this line
 
     // basic validation
     if (!username || !email || !password || !role) {
