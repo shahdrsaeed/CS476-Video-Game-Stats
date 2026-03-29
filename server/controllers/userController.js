@@ -2,11 +2,13 @@ const User = require('../models/User');
 const Player = require('../models/Player');
 const Coach = require('../models/Coach');
 const bcrypt = require('bcrypt'); 
+const jwt = require('jsonwebtoken');
 
 // Create (Player or Coach)
 exports.create = async (req, res) => {
   try {
     const { username, email, password, role, ...rest } = req.body;
+   const imageURL = req.file ? req.file.secure_url : ''; // added this line
 
     // basic validation
     if (!username || !email || !password || !role) {
@@ -29,6 +31,7 @@ exports.create = async (req, res) => {
         username,
         email,
         password: hashedPassword,
+        imageURL, // add this
         ...rest // rank, level, etc.
       });
     } 
@@ -37,6 +40,7 @@ exports.create = async (req, res) => {
         username,
         email,
         password: hashedPassword,
+        imageURL, // add this
         ...rest
       });
     } 
@@ -70,18 +74,29 @@ exports.login = async (req, res) => {
             return res.status(400).json({ error: 'Invalid email or password' });
         }
 
-        isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ error: 'Invalid email or password' });
         }
+
+        const token = jwt.sign(
+            {
+                id: user._id,
+                role: user.role,
+                teamId: user.teamId
+            },
+            process.env.JWT_SECRET || 'secretkey',
+            { expiresIn: '7d' }
+        );
 
         const userObj = user.toObject();
         delete userObj.password;
 
         res.status(200).json({
             message: 'Login successful',
+            token,
             user: userObj
-        });
+      });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

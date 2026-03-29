@@ -5,13 +5,20 @@ import { Shield, User, Users, ClipboardList, LayoutDashboard, LogOut, Search } f
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const role = localStorage.getItem('userRole') || 'player'; 
+  const role = localStorage.getItem('userRole') || 'player';
+  const token = localStorage.getItem('token');
+
+  // sign out clears localStorage and redirects to login
+  const handleSignOut = () => {
+    localStorage.clear();
+    navigate('/login');
+  };
 
   const links = [
-    { label: 'OVERVIEW',      path: '/general',       icon: <LayoutDashboard size={14} /> },
-    { label: 'MY PROFILE',    path: '/player',        icon: <User size={14} />, playerOnly: true },
-    { label: 'TEAM SEARCH',   path: '/search',        icon: <Search size={14} /> },
-    { label: 'COACH PANEL',   path: '/coach',         icon: <Users size={14} />, coachOnly: true },
+    { label: 'OVERVIEW', path: '/general', icon: <LayoutDashboard size={14} /> },
+    { label: 'MY PROFILE', path: '/player', icon: <User size={14} />, playerOnly: true },
+    { label: 'TEAM SEARCH', path: '/search', icon: <Search size={14} /> },
+    { label: 'COACH PANEL', path: '/coach', icon: <Users size={14} />, coachOnly: true },
     { label: 'REGISTRATIONS', path: '/registrations', icon: <ClipboardList size={14} />, coachOnly: true },
   ];
 
@@ -31,27 +38,33 @@ const Navbar = () => {
 
       {/* Nav links */}
       <div style={styles.links}>
-        {visibleLinks.map(link => {
-          const active = location.pathname === link.path;
-          return (
-            <button
-              key={link.path}
-              style={{ ...styles.link, ...(active ? styles.linkActive : {}) }}
-              onClick={() => navigate(link.path)}
-            >
-              {link.icon}
-              <span style={{ marginLeft: 6 }}>{link.label}</span>
-              {active && <div style={styles.activeDot} />}
-            </button>
-          );
-        })}
+        {token ? ( // Only show the links if the user is logged in
+          visibleLinks.map(link => {
+            const active = location.pathname === link.path;
+            return (
+              <button
+                key={link.path}
+                style={{ ...styles.link, ...(active ? styles.linkActive : {}) }}
+                onClick={() => navigate(link.path)}
+              >
+                {link.icon}
+                <span style={{ marginLeft: 6 }}>{link.label}</span>
+                {active && <div style={styles.activeDot} />}
+              </button>
+            );
+          })
+        ) : (
+          <p style={{ color: '#fff', fontSize: 14 }}>Please log in to access the app</p>
+        )}
       </div>
 
       {/* Sign out */}
-      <button style={styles.logoutBtn} onClick={() => navigate('/login')}>
-        <LogOut size={14} style={{ marginRight: 6 }} />
-        SIGN OUT
-      </button>
+      {token && ( // Only show the sign-out button if the user is logged in
+        <button style={styles.logoutBtn} onClick={handleSignOut}>
+          <LogOut size={14} style={{ marginRight: 6 }} />
+          SIGN OUT
+        </button>
+      )}
     </div>
   );
 };

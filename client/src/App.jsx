@@ -1,3 +1,4 @@
+// replace path from /modules to /views
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import SignUpView from './views/SignUpView'
 import LoginView from './views/LoginView'
