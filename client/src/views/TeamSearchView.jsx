@@ -27,6 +27,8 @@ const TeamSearchView = () => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [selectedStats, setSelectedStats] = useState(null); // ← add this
+  const [modalLoading, setModalLoading] = useState(false);  // ← add this
   const [requests, setRequests] = useState([]);
 
   // Fetch requests if the user is a coach
@@ -118,9 +120,25 @@ const TeamSearchView = () => {
     }
   };
 
-  // Filter players based on search query
+  // get individual stats of player when user clicks on "view profile"
+  const handleSelectPlayer = async (player) => {
+  setSelected(player);
+  setSelectedStats(null);
+  setModalLoading(true);
+
+  try {
+    const res = await getPlayerStats(player._id); // already imported
+    setSelectedStats(res.data);
+  } catch (err) {
+    console.error('Failed to fetch player stats:', err);
+  } finally {
+    setModalLoading(false);
+  }
+};
+
+  // Filter players based on search query (CHANGED SEARCH QUERY)
   const filtered = players.filter(p =>
-    p.username.toLowerCase().includes(query.toLowerCase())
+    p.username.toLowerCase().startsWith(query.toLowerCase())
   );
 
   if (loading) return <div style={{ color: '#fff', padding: 40 }}>Loading...</div>;
@@ -166,7 +184,7 @@ const TeamSearchView = () => {
               <div
                 key={player._id}
                 style={styles.card}
-                onClick={() => setSelected(player)}
+                onClick={() => handleSelectPlayer(player)}
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,70,85,0.4)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#1a1f2e'}
               >
@@ -192,13 +210,13 @@ const TeamSearchView = () => {
                 </div>
                 <div style={styles.teamBadge}>
                   <Shield size={11} color="#ff4655" style={{ marginRight: 5 }} />
-                  {player.teamId ?? 'No Team'}
+                  {player.teamId?.teamName ?? 'No Team'}
                 </div>
                 <div style={styles.cardStats}>
                   {[
                     { label: 'K/D',  value: player.kdRatio },
                     { label: 'WIN%', value: player.winRate },
-                    { label: 'ACS',  value: player.stats?.acs },
+                    { label: 'ACS', value: 'N/A' }, // keep as N/A for now
                     { label: 'HS%',  value: player.headshotPercentage },
                   ].map(s => (
                     <div key={s.label} style={styles.statItem}>
@@ -224,7 +242,7 @@ const TeamSearchView = () => {
             {/* Header with Request button */}
             <div style={modal.header}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <img src={selected.avatar} alt={selected.username} style={modal.avatar} />
+                <img src={selected.imageURL} alt={selected.username} style={modal.avatar} /> {/* Changed this, avatar should now show in popup window */}
                 <div>
                   <div style={modal.name}>{selected.username}</div>
                   <div style={{ fontSize: 12, color: '#555' }}>{selected.valorantId}</div> {/* not in player schema */}
@@ -248,15 +266,15 @@ const TeamSearchView = () => {
               </div>
             </div>
 
-            {/* Stats grid */}
+            {/* Stats grid */} {/* CHANGED THIS */}
             <div style={modal.statsGrid}>
               {[
                 { label: 'K/D',     value: selected.kdRatio },
-                { label: 'WIN RATE',value: selected.winRate },
-                { label: 'ACS',     value: selected.stats?.acs },
-                { label: 'HS%',     value: selected.headshotPercentage },
-                { label: 'KAST',    value: 'N/A' },
-                { label: 'DMG/RND', value: 'N/A' },
+                { label: 'WIN RATE',value: selected.winRate + '%' },
+                { label: 'ACS',     value: modalLoading ? '...' : (selectedStats?.acs ?? 'N/A') },
+                { label: 'HS%',     value: selected.headshotPercentage + '%' },
+                { label: 'KAST',    value: modalLoading ? '...' : (selectedStats?.kast ?? 'N/A') },
+                { label: 'DMG/RND', value: modalLoading ? '...' : (selectedStats?.damagePerRound ?? 'N/A') },
                 { label: 'KILLS',   value: selected.stats?.kills },
                 { label: 'MATCHES', value: (selected.stats?.wins ?? 0) + (selected.stats?.losses ?? 0) },
               ].map(s => (
@@ -274,13 +292,20 @@ const TeamSearchView = () => {
                 <tr>{['AGENT', 'MATCHES', 'WIN%', 'K/D', 'ACS'].map(h => <th key={h} style={modal.th}>{h}</th>)}</tr>
               </thead>
               <tbody>
+                {/* CHANGED THIS */}
                 {(selected.topAgents ?? []).map(a => (
-                  <tr key={a.name}>
-                    <td style={modal.td}><strong style={{ color: '#fff' }}>{a.name}</strong><div style={{ fontSize: 10, color: '#555' }}>{a.role}</div></td>
-                    <td style={modal.td}>{a.matches}</td>
-                    <td style={{ ...modal.td, color: '#22c55e', fontWeight: 700 }}>{a.winRate}</td>
-                    <td style={{ ...modal.td, fontWeight: 700 }}>{a.kd}</td>
-                    <td style={{ ...modal.td, color: '#ff4655', fontWeight: 700 }}>{a.acs}</td>
+                  <tr key={a.agent?.name ?? a._id}>
+                    <td style={modal.td}>
+                      <strong style={{ color: '#fff' }}>{a.agent?.name ?? 'Unknown'}</strong>
+                    </td>
+                    <td style={modal.td}>{a.matchesPlayed}</td>
+                    <td style={{ ...modal.td, color: '#22c55e', fontWeight: 700 }}>
+                      {a.matchesPlayed ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%' : '0%'}
+                    </td>
+                    <td style={{ ...modal.td, fontWeight: 700 }}>
+                      {a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2)}
+                    </td>
+                    <td style={{ ...modal.td, color: '#ff4655', fontWeight: 700 }}>N/A</td>
                   </tr>
                 ))}
               </tbody>
@@ -288,11 +313,14 @@ const TeamSearchView = () => {
 
             {/* Top maps */}
             <div style={modal.sectionTitle}><Shield size={12} color="#ff4655" style={{ marginRight: 6 }} />TOP MAPS</div>
-            {(selected.topMaps ?? []).map(m => (
-              <div key={m.map} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', padding: '8px 0' }}>
-                <span style={{ color: '#fff', fontWeight: 700, flex: 1 }}>{m.map}</span>
+              {/* CHANGED THIS */}
+              {(selected.topMaps ?? []).map(m => (
+              <div key={m.map?.name ?? m._id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', padding: '8px 0' }}>
+                <span style={{ color: '#fff', fontWeight: 700, flex: 1 }}>{m.map?.name ?? 'Unknown'}</span>
                 <span style={{ fontSize: 11, color: '#555', marginRight: 16 }}>{m.wins}W - {m.losses}L</span>
-                <span style={{ color: '#22c55e', fontWeight: 900 }}>{m.winRate}</span>
+                <span style={{ color: '#22c55e', fontWeight: 900 }}>
+                  {m.matchesPlayed ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%' : '0%'}
+                </span>
               </div>
             ))}
           </div>

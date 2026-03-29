@@ -21,6 +21,13 @@ const mapRoutes = require('./routes/mapRoutes');
 const matchRoutes = require('./routes/matchRoutes');
 const requestRoutes = require('./routes/requestRoutes');
 
+// ── Register models so Mongoose can populate refs ──
+require('./models/submodel/Agent');
+require('./models/submodel/Weapon');
+require('./models/submodel/Match');
+require('./models/submodel/Map');
+require('./models/Team');
+
 app.use('/api/players', playerRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/coach', coachRoutes);

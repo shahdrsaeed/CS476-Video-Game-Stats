@@ -19,6 +19,9 @@ export const getUser = (id) => {
   return axios.get(`/api/users/${id}`);
 };
 
+// used in PlayerProfileView
+export const getPlayerStats = (id) => axios.get(`/api/players/${id}/stats`);
+
 // used in TeamSearchView
 export const getAllPlayers = (search = '') => {
   return axios.get(`/api/players${search ? `?search=${search}` : ''}`);

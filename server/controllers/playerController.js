@@ -3,10 +3,14 @@ const Player = require('../models/Player');
 const {
   calculateRoundWinPercentage,
   calculateKAST,
-  calculateDDDeltaPerRound
+  calculateDDDeltaPerRound,
+  calculateACS,             // added this
+  calculateKillsPerRound,   // ← add
+  calculateDamagePerRound  // ← add
 } = require('../helpers/statsCalculator');
 
 // Get player stats - this would be used to retrieve a player's stats for display on the frontend
+/*
 const getPlayerStats = async (req, res) => {
   try {
     const { id } = req.params;
@@ -37,6 +41,51 @@ const getPlayerStats = async (req, res) => {
       ddDeltaPerRound,
       acs
     });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+*/
+const getPlayerStats = async (req, res) => { // modified function to get necessary data for front end and merge computed stats into a player object
+  try {
+    const { id } = req.params;
+
+    const player = await Player.findById(id)
+      .select('-password')
+      .populate('teamId', 'teamName')          // ← add this line
+      .populate({
+        path: 'last20Matches.match',
+        select: 'rounds players score map datePlayed result',
+        populate: { path: 'map', select: 'name' }
+      })
+      .populate('topAgents.agent', 'name')
+      .populate('topWeapons.weapon', 'name type')
+      .populate('topMaps.map', 'name');
+
+    if (!player) return res.status(404).json({ message: 'Player not found' });
+
+    const roundWinPercentage = calculateRoundWinPercentage(player);
+    const kast = calculateKAST(player);
+    const ddDeltaPerRound = calculateDDDeltaPerRound(player);
+    const acs = calculateACS(player);
+    const killsPerRound = calculateKillsPerRound(player);   // ← add
+    const damagePerRound = calculateDamagePerRound(player); // ← add
+
+    // Merge computed stats into the player object
+    const playerObj = player.toObject();
+    delete playerObj.password;
+
+    return res.json({
+      ...playerObj,
+      roundWinPercentage,
+      kast,
+      ddDeltaPerRound,
+      acs,
+      killsPerRound,   // ← add
+      damagePerRound  // ← add
+    });
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Server error' });
@@ -76,21 +125,22 @@ const updatePlayer = async (req, res) => {
   }
 };
 
-// Get all players - for team search
+// Get all players - for team search (MODIFIED FUNCTION to add more data for frontend)
 const getAllPlayers = async (req, res) => {
   try {
     const { search } = req.query;
-
     let query = {};
-
-    // if a search term is provided, filter by username
     if (search) {
-      query.username = { $regex: search, $options: 'i' }; // case-insensitive
+      query.username = { $regex: search, $options: 'i' };
     }
 
-    const players = await Player.find(query).select('-password');
-    res.json(players);
+    const players = await Player.find(query)
+      .select('-password')
+      .populate('teamId', 'teamName')        // ← add this
+      .populate('topAgents.agent', 'name')   // ← add this for modal
+      .populate('topMaps.map', 'name');      // ← add this for modal
 
+    res.json(players);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -100,5 +150,5 @@ module.exports = {
   getPlayerStats,
   getPlayerById,
   updatePlayer,
-  getAllPlayers
+  getAllPlayers,
 };

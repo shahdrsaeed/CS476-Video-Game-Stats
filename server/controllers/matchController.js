@@ -59,6 +59,7 @@ const getMatch = async (req, res) => {
     }
 };
 
+/* 
 const applyMatchToPlayers = async (match) => {
     for (const p of match.players) {
         const player = await Player.findById(p.player).session(session); // session included so read is scoped into transaction
@@ -101,5 +102,37 @@ const applyMatchToPlayers = async (match) => {
         await player.save({session}); // session included so write is scoped into transaction
     }
 };
+*/
 
+const applyMatchToPlayers = async (match, session) => {  // ← add session param
+    for (const p of match.players) {
+        const player = await Player.findById(p.player).session(session);
+
+        if (!player) continue;
+
+        // REMOVED: player.stats.roundsPlayed — field doesn't exist in your schema
+
+        player.stats.kills += p.stats.kills;
+        player.stats.deaths += p.stats.deaths;
+        player.stats.assists += p.stats.assists;
+        player.stats.headshots += p.stats.headshots;
+        player.stats.bodyshots += p.stats.bodyshots;
+        player.stats.legshots += p.stats.legshots;
+        player.stats.firstBloods += p.stats.firstBloods;
+        player.stats.firstDeaths += p.stats.firstDeaths;
+        player.stats.aces += p.stats.aces;
+        player.stats.flawlessRounds += p.stats.flawlessRounds;
+
+        const didWin = match.result.winningTeam === p.team;
+        if (didWin) player.stats.wins += 1;
+        else player.stats.losses += 1;
+
+        player.addMatch({
+            match: match._id,
+            result: didWin ? 'Win' : 'Loss'
+        });
+
+        await player.save({ session });
+    }
+};
 module.exports = { createMatch, getMatch, applyMatchToPlayers };

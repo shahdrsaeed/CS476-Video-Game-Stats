@@ -3,6 +3,7 @@ import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, C
 // import { PLAYERS_LIST } from '../data/mockData';
 import { getUser } from '../services/UserApi';
 import Navbar from '../components/Navbar'
+import { getPlayerStats } from '../services/UserApi';
 
 // ── Rank color helper ──
 const rankColor = (rank) => {
@@ -70,86 +71,77 @@ const generateFakeMatch = () => {
     const fetchPlayer = async () => {
       try {
         const stored = localStorage.getItem('user');
+        console.log('stored user:', stored); // ← add this
         if (!stored) return;
 
         const { _id } = JSON.parse(stored);
-        const res = await getUser(_id);
+        console.log('_id:', _id); // ← and this
+        const res = await getPlayerStats(_id);  // ← use new endpoint
         const raw = res.data;
 
-        // Adapt DB shape → what the JSX expects
-        const adapted = {
-          ...raw,
+       const adapted = {
+        ...raw, // gets all virtuals and direct fields for free
 
-          // Fields not yet in DB — show fallback values
-          valorantId: raw.username, // not in player schema
-          team:       raw.teamId ?? 'No Team',
-          playtime:   'N/A',
-          peakRank:   raw.rank,
-          peakRR:     raw.rr,
+        // Field renames / reshapes
+        team:           raw.teamId?.teamName ?? 'No Team',
+        peakRank:       raw.rank,
+        peakRR:         raw.rr,
 
-          // Computed stats not yet in DB
-          damagePerRound: 'N/A',
-          kast:           'N/A',
-          killsPerRound:  raw.stats?.kills && raw.matchesPlayed
-                            ? (raw.stats.kills / raw.matchesPlayed).toFixed(2)
-                            : 'N/A',
-          ddDeltaPerRound: 'N/A',
-          roundWinRate:    'N/A',
+        // Computed stats from backend
+        ddDeltaPerRound: raw.ddDeltaPerRound ?? 'N/A',
+        roundWinRate:    raw.roundWinPercentage ? raw.roundWinPercentage + '%' : 'N/A',
+        kast:            raw.kast ? raw.kast + '%' : 'N/A',
+        acs:             raw.acs ?? 'N/A',
 
-          // roles doesn't exist yet — empty array so .map() won't crash
-          roles: [],
+        // Not yet in backend
+        damagePerRound: raw.damagePerRound ?? 'N/A',
+        killsPerRound:  raw.killsPerRound  ?? 'N/A',
+        roles:          [],
 
-          // topAgents: reshape populated agent objects
-          topAgents: (raw.topAgents ?? []).map(a => ({
-            name:     a.agent?.name    ?? 'Unknown',
-            hours:    'N/A',
-            matches:  a.matchesPlayed  ?? 0,
-            winRate:  a.matchesPlayed
-                        ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%'
-                        : '0%',
-            kd:       a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
-            acs:      'N/A',
-          })),
+        // Array reshapes (still needed since nested refs need flattening)
+        topAgents: (raw.topAgents ?? []).map(a => ({
+          name:    a.agent?.name ?? 'Unknown',
+          hours:   'N/A',
+          matches: a.matchesPlayed ?? 0,
+          winRate: a.matchesPlayed ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%' : '0%',
+          kd:      a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
+          acs:     'N/A',
+        })),
 
-          // topWeapons: reshape populated weapon objects
-          topWeapons: (raw.topWeapons ?? []).map(w => {
-            const total = (w.headshotKills ?? 0) + (w.bodyshotKills ?? 0) + (w.legshotKills ?? 0);
-            return {
-              weapon:      w.weapon?.name ?? 'Unknown',
-              type:        w.weapon?.type ?? '',
-              kills:       w.totalKills   ?? 0,
-              headshotPct: total ? ((w.headshotKills / total) * 100).toFixed(1) + '%' : '0%',
-              bodyPct:     total ? ((w.bodyshotKills  / total) * 100).toFixed(1) + '%' : '0%',
-              legsPct:     total ? ((w.legshotKills   / total) * 100).toFixed(1) + '%' : '0%',
-            };
-          }),
+        topWeapons: (raw.topWeapons ?? []).map(w => {
+          const total = (w.headshotKills ?? 0) + (w.bodyshotKills ?? 0) + (w.legshotKills ?? 0);
+          return {
+            weapon:       w.weapon?.name ?? 'Unknown',
+            type:         w.weapon?.type ?? '',
+            kills:        w.totalKills ?? 0,
+            headshotPct:  total ? ((w.headshotKills / total) * 100).toFixed(1) + '%' : '0%',
+            bodyPct:      total ? ((w.bodyshotKills  / total) * 100).toFixed(1) + '%' : '0%',
+            legsPct:      total ? ((w.legshotKills   / total) * 100).toFixed(1) + '%' : '0%',
+          };
+        }),
 
-          // topMaps: reshape populated map objects
-          topMaps: (raw.topMaps ?? []).map(m => ({
-            map:     m.map?.name ?? 'Unknown',
-            wins:    m.wins      ?? 0,
-            losses:  m.losses    ?? 0,
-            winRate: m.matchesPlayed
-                      ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%'
-                      : '0%',
-          })),
+        topMaps: (raw.topMaps ?? []).map(m => ({
+          map:     m.map?.name ?? 'Unknown',
+          wins:    m.wins ?? 0,
+          losses:  m.losses ?? 0,
+          winRate: m.matchesPlayed ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%' : '0%',
+        })),
 
-          // last20Matches → recentMatches (reshape for the table)
-          recentMatches: (raw.last20Matches ?? []).map(m => ({
-            date:      m.match?.date   ?? 'N/A',
-            map:       m.match?.map    ?? 'N/A',
-            result:    m.result === 'Win' ? 'W' : 'L',
-            score:     m.match?.score  ?? 'N/A',
-            kd:        m.match?.kd     ?? 0,
-            kda:       m.match?.kda    ?? 'N/A',
-            ddDelta:   m.match?.ddDelta ?? 0,
-            hs:        m.match?.hs     ?? 0,
-            acs:       m.match?.acs    ?? 0,
-            placement: m.match?.placement ?? 'N/A',
-          })),
-        };
+        recentMatches: (raw.last20Matches ?? []).map(m => ({
+          date:      m.match?.datePlayed ? new Date(m.match.datePlayed).toLocaleDateString() : 'N/A',
+          map:       m.match?.map?.name ?? 'N/A',
+          result:    m.result === 'Win' ? 'W' : 'L',
+          score:     m.match?.score ? `${m.match.score.teamA}:${m.match.score.teamB}` : 'N/A',
+          kd:        'N/A',
+          kda:       'N/A',
+          ddDelta:   'N/A',
+          hs:        'N/A',
+          acs:       'N/A',
+          placement: 'N/A',
+        })),
+      };
 
-        setPlayer(adapted);
+      setPlayer(adapted);
       } catch (err) {
         console.error('Failed to fetch player:', err);
       } finally {
@@ -185,11 +177,12 @@ const generateFakeMatch = () => {
             />
             <div>
               <div style={styles.bannerName}>{player.username}</div>
-              <div style={styles.bannerTag}>{player.valorantId}</div> {/* not in player schema */}
+              {/* <div style={styles.bannerTag}>{player.valorantId}</div> // not in player schema */}
+              <div style={styles.bannerTag}>{player.role}</div> {/*Since valorantId does not exist, replaced with role */}
               <div style={styles.bannerMeta}>
                 <span style={styles.metaBadge}>{player.team}</span>
                 <span style={styles.metaBadge}>LVL {player.level}</span>
-                <span style={styles.metaBadge}>{player.playtime} · {player.matches} matches</span>
+                <span style={styles.metaBadge}>{player.matchesPlayed} matches</span>
               </div>
             </div>
           </div>
@@ -206,7 +199,7 @@ const generateFakeMatch = () => {
           {[
             { label: 'K/D RATIO', value: player.kdRatio, sub: 'Top 9.0%' },
             { label: 'WIN RATE', value: player.winRate, sub: `${player.stats.wins}W - ${player.stats.losses}L` },
-            { label: 'ACS', value: player.stats.acs, sub: 'Top 7.0%' },
+            { label: 'ACS', value: player.acs, sub: 'Top 7.0%' },
             { label: 'HEADSHOT %', value: player.headshotPercentage, sub: 'Top 3.1%' },
             { label: 'DMG/ROUND', value: player.damagePerRound, sub: 'Top 7.0%' },
             { label: 'KAST', value: player.kast, sub: 'Top 19.0%' },
