@@ -6,7 +6,11 @@ const {
   calculateDDDeltaPerRound,
   calculateACS,             // added this
   calculateKillsPerRound,   // ← add
-  calculateDamagePerRound  // ← add
+  calculateDamagePerRound,  // ← add
+  calculateACS,
+  calculateTopAgents,
+  calculateTopMaps,
+  calculateTopWeapons
 } = require('../helpers/statsCalculator');
 
 // Get player stats - this would be used to retrieve a player's stats for display on the frontend
@@ -39,7 +43,10 @@ const getPlayerStats = async (req, res) => {
       roundWinPercentage,
       kast,
       ddDeltaPerRound,
-      acs
+      acs,
+      topAgents: calculateTopAgents(player),
+      topMaps: calculateTopMaps(player),
+      topWeapons: calculateTopWeapons(player)
     });
   } catch (error) {
     console.error(error);
@@ -115,7 +122,7 @@ const updatePlayer = async (req, res) => {
     const updatedPlayer = await Player.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true }
+      { new: true, runValidators: true } // runValidator enforces enum
     );
 
     res.json(updatedPlayer);

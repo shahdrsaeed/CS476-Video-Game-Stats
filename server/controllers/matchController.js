@@ -67,14 +67,10 @@ const applyMatchToPlayers = async (match) => {
         if (!player) continue;
 
         // Update stats
-        player.stats.roundsPlayed += match.rounds.length;
 
         player.stats.kills += p.stats.kills;
         player.stats.deaths += p.stats.deaths;
         player.stats.assists += p.stats.assists;
-
-        player.stats.damageDealt += p.stats.damageDealt;
-        player.stats.damageTaken += p.stats.damageTaken;
 
         player.stats.headshots += p.stats.headshots;
         player.stats.bodyshots += p.stats.bodyshots;

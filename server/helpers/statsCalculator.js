@@ -100,7 +100,7 @@ const calculateACS = (player) => {
       if (!p) return;
 
       totalRounds++;
-      totalDamage += damageDealt;
+      totalDamage += p.damageDealt;
     });
   });
 
@@ -183,11 +183,120 @@ const calculateDamagePerRound = (player) => {
   return (totalDamage / totalRounds).toFixed(2);
 };
 
+/**
+ * Calculate top 3 agents by win rate over last 20 matches
+ * @param {Object} player
+ * @returns {Array}
+ */
+const calculateTopAgents = (player) => {
+  const agentData = {};
+
+  player.last20Matches.forEach(entry => {
+    const match = entry.match;
+    if (!match || !match.players) return;
+
+    const matchPlayer = match.players.find(mp => mp.player.equals(player._id));
+    if (!matchPlayer || !matchPlayer.agent) return;
+
+    const agentId = matchPlayer.agent.toString();
+
+    if (!agentData[agentId]) {
+      agentData[agentId] = { agent: agentId, matchesPlayed: 0, wins: 0, losses: 0, kills: 0, deaths: 0, assists: 0};
+    }
+
+    agentData[agentId].matchesPlayed++;
+    agentData[agentId].kills += matchPlayer.stats.kills;
+    agentData[agentId].deaths += matchPlayer.stats.deaths;
+    agentData[agentId].assists += matchPlayer.stats.assists;
+
+    if (entry.result === 'Win') agentData[agentId].wins++;
+    else agentData[agentId].losses++;
+  });
+
+  return Object.values(agentData)
+    .sort((a, b) => {
+      const aWr = a.wins / (a.matchesPlayed || 1);
+      const bWr = b.wins / (b.matchesPlayed || 1);
+      return bWr - aWr;
+    })
+    .slice(0, 3);
+};
+
+/**
+ * Calculate top 3 maps by win rate over last 20 matches
+ * @param {Object} player
+ * @returns {Array} 
+ */
+const calculateTopMaps = (player) => {
+  const mapData = {};
+
+  player.last20Matches.forEach(entry => {
+    const match = entry.match;
+    if (!match || !match.map) return;
+
+    const mapId = match.map.toString();
+
+    if (!mapData[mapId]) {
+      mapData[mapId] = { map: mapId, matchesPlayed: 0, wins: 0, losses: 0 };
+    }
+
+    mapData[mapId].matchesPlayed++;
+
+    if (entry.result === 'Win') mapData[mapId].wins++;
+    else mapData[mapId].losses++;
+  });
+
+  return Object.values(mapData)
+    .sort((a, b) => {
+      const aWR = a.wins / (a.matchesPlayed || 1);
+      const bWR = b.wins / (b.matchesPlayed || 1);
+      return bWR - aWR;
+    })
+    .slice(0, 3);
+};
+
+/**
+ * Calculate top 3 weapons by kills over last 20 matches
+ * @param {Object} player
+ * @returns {Array}
+ */
+const calculateTopWeapons = (player) => {
+  const weaponData = {};
+
+  player.last20Matches.forEach(entry => {
+    const match = entry.match;
+    if (!match || !match.players) return;
+
+    const matchPlayer = match.players.find(mp => mp.player.equals(player._id));
+    if (!matchPlayer || !matchPlayer.topWeapons) return;
+
+    matchPlayer.topWeapons.forEach(w => {
+      const weaponId = w.weapon.toString();
+
+      if (!weaponData[weaponId]) {
+        weaponData[weaponId] = { weapon: weaponId, totalKills: 0, headshotKills: 0, bodyshotKills: 0, legshotKills: 0 };
+      }
+
+      weaponData[weaponId].totalKills += w.totalKills;
+      weaponData[weaponId].headshotKills += w.headshotKills;
+      weaponData[weaponId].bodyshotKills += w.bodyshotKills;
+      weaponData[weaponId].legshotKills += w.legshotKills;
+    });
+  });
+
+  return Object.values(weaponData)
+    .sort((a, b) => b.totalKills - a.totalKills)
+    .slice(0, 3);
+};
+
 module.exports = {
   calculateRoundWinPercentage,
   calculateKAST,
   calculateDDDeltaPerRound,
   calculateACS,
   calculateKillsPerRound,   // ← add
-  calculateDamagePerRound  // ← add
+  calculateDamagePerRound,  // ← add
+  calculateTopAgents,
+  calculateTopMaps,
+  calculateTopWeapons
 };
