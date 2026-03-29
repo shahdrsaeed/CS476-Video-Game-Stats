@@ -1,29 +1,5 @@
-/*import { COACH_DATA, TEAMS_LIST, REGISTRATION_REQUESTS } from '../data/mockData';
-
-export const useGeneralData = () => {
-  return {
-    coach: COACH_DATA || {}, 
-    topTeams: TEAMS_LIST || [], 
-    requests: REGISTRATION_REQUESTS || []
-  };
-};
-*/
-
-/*
-import { COACH_DATA, PLAYERS_LIST, REGISTRATION_REQUESTS } from '../data/mockData';
-
-export const useGeneralData = () => {
-  return {
-    coach: COACH_DATA || {},
-    topTeams: PLAYERS_LIST || [],
-    players: PLAYERS_LIST || [],
-    requests: REGISTRATION_REQUESTS || []
-  };
-};
-*/
-
 import { useState, useEffect } from 'react';
-import { getCoach, getTeam, getUser } from '../services/UserApi';
+import { getCoach, getUser, getCoachPlayers } from '../services/UserApi'; // ← removed getTeam
 
 export const useGeneralData = () => {
   const [coach, setCoach] = useState(null);
@@ -39,40 +15,33 @@ export const useGeneralData = () => {
         const { _id, role } = JSON.parse(stored);
 
         if (role === 'Coach') {
-          // Coach: fetch their own profile + team
           const coachRes = await getCoach(_id);
           const coachData = coachRes.data;
-          setCoach(coachData);
 
-          if (coachData.teamId) {
-            const teamRes = await getTeam(coachData.teamId);
-            const teamData = teamRes.data;
-            setCoach({ ...coachData, teamName: teamData.teamName });   // attach team name to coach so GeneralView can display it
-            setTopTeams(teamRes.data.players ?? []);
-          }
+          setCoach({
+            ...coachData,
+            teamName: coachData.teamId?.teamName ?? 'No Team'
+          });
+
+          const playersRes = await getCoachPlayers(_id);
+          setTopTeams(playersRes.data);
 
         } else if (role === 'Player') {
-          // Player: fetch their own data first to get coach reference
           const playerRes = await getUser(_id);
           const playerData = playerRes.data;
 
           if (playerData.coach) {
-            // Fetch the coach using the player's coach field
             const coachRes = await getCoach(playerData.coach);
             const coachData = coachRes.data;
-            setCoach(coachData);
 
-            // Fetch the coach's team
-            if (coachData.teamId) {
-              const teamRes = await getTeam(coachData.teamId);
-              const teamData = teamRes.data;
+            setCoach({
+              ...coachData,
+              teamName: coachData.teamId?.teamName ?? 'No Team'
+            });
 
-              setCoach({ ...coachData, teamName: teamData.teamName });   // attach team name to coach so GeneralView can display it
-              setTopTeams(teamRes.data.players ?? []);
-            }
+            const playersRes = await getCoachPlayers(playerData.coach);
+            setTopTeams(playersRes.data);
           }
-          // if player.coach is null, coach stays null
-          // GeneralView will show "No Coach" message
         }
 
       } catch (err) {

@@ -1,10 +1,17 @@
 const Player = require('../models/Player');
+const Coach = require('../models/Coach');
 const { calculateACS } = require('../helpers/statsCalculator');
 
 // Get all players assigned to a coach
 const getPlayers = async (req, res) => {
   try {
-    const players = await Player.find({ coach: req.params.id });
+    const players = await Player.find({ coach: req.params.id })
+    // added this so that player cards in front end can have the data they need
+    .select('-password')
+      .populate('teamId', 'teamName')
+      .populate('topAgents.agent', 'name')
+      .populate('topMaps.map', 'name');
+
     res.status(200).json(players);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -30,9 +37,13 @@ const assignPlayer = async (req, res) => {
 // Get aggregated stats for a coach's players
 const getAggregatedStats = async (req, res) => {
   try {
-    // Get all players for this coach
-    const players = await Player.find({ coach: req.params.id });
-
+    // Get all players for this coach (MODIFIED TO POPULATE LAST 20 MATCHES)
+    const players = await Player.find({ coach: req.params.id })
+    .populate({
+      path: 'last20Matches.match',
+      select: 'rounds players',
+    });
+    
     if (players.length === 0) {
       return res.status(404).json({ message: 'No players found for this coach' });
     }
@@ -64,8 +75,24 @@ const getAggregatedStats = async (req, res) => {
   }
 };
 
+// added a get coach function
+const getCoachById = async (req, res) => {
+  try {
+    const coach = await Coach.findById(req.params.id)
+      .select('-password')
+      .populate('teamId', 'teamName');  // populate team name here
+
+    if (!coach) return res.status(404).json({ message: 'Coach not found' });
+
+    res.json(coach.toObject());
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
     getPlayers,
     assignPlayer,
-    getAggregatedStats
+    getAggregatedStats,
+    getCoachById  // ← add this
 }

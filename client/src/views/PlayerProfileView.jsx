@@ -200,7 +200,7 @@ const generateFakeMatch = () => {
             { label: 'K/D RATIO', value: player.kdRatio, sub: 'Top 9.0%' },
             { label: 'WIN RATE', value: player.winRate, sub: `${player.stats.wins}W - ${player.stats.losses}L` },
             { label: 'ACS', value: player.acs, sub: 'Top 7.0%' },
-            { label: 'HEADSHOT %', value: player.headshotPercentage, sub: 'Top 3.1%' },
+            { label: 'HEADSHOT %', value: player.headshotPercentage + '%', sub: 'Top 3.1%' }, 
             { label: 'DMG/ROUND', value: player.damagePerRound, sub: 'Top 7.0%' },
             { label: 'KAST', value: player.kast, sub: 'Top 19.0%' },
           ].map((s) => (
