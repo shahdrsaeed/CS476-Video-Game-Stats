@@ -1,65 +1,233 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'; // added RefreshCw
-// import { PLAYERS_LIST } from '../data/mockData';
+import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, RefreshCw } from 'lucide-react';
 import { getUser } from '../services/UserApi';
-import Navbar from '../components/Navbar'
+import Navbar from '../components/Navbar';
 
 // ── Rank color helper ──
 const rankColor = (rank) => {
   if (!rank) return '#888';
-  if (rank.includes('RADIANT')) return '#ffffa0';
+  if (rank.includes('RADIANT'))  return '#ffffa0';
   if (rank.includes('IMMORTAL')) return '#ff4655';
-  if (rank.includes('DIAMOND')) return '#a78bfa';
+  if (rank.includes('DIAMOND'))  return '#a78bfa';
   if (rank.includes('PLATINUM')) return '#38bdf8';
   return '#888';
 };
 
-// ── Result color ──
-const resultColor = (r) => r === 'W' ? '#22c55e' : '#ff4655';
+const resultColor = (r) => (r === 'W' ? '#22c55e' : '#ff4655');
 
-const PlayerProfileView = () => {
-  // For now show the first player (later this will come from login/routing)
-  // const player = PLAYERS_LIST[0];
-  const [player, setPlayer] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [expandedMatch, setExpandedMatch] = useState(null);
+// ── Weighted-blend helper ──
+// Blends a single numeric value: (old * n + newVal) / (n + 1)
+const blend = (oldVal, newVal, n) => {
+  const o = parseFloat(oldVal) || 0;
+  const v = parseFloat(newVal) || 0;
+  return parseFloat(((o * n + v) / (n + 1)).toFixed(2));
+};
 
-  const [justUpdated, setJustUpdated] = useState(false);
-const [spinning, setSpinning] = useState(false);
-
-const maps = ['Haven', 'Pearl', 'Bind', 'Abyss', 'Split', 'Breeze', 'Corrode'];
-const placements = ['MVP', '2nd', '3rd', '4th', '5th'];
+// ── Static pools for fake match generation ──
+const MAPS      = ['Haven', 'Pearl', 'Bind', 'Abyss', 'Split', 'Breeze', 'Corrode'];
+const AGENTS    = ['Jett', 'Reyna', 'Sage', 'Omen', 'Killjoy', 'Sova', 'Neon', 'Cypher'];
+const WEAPONS   = ['Vandal', 'Phantom', 'Operator', 'Sheriff', 'Spectre'];
+const WEAPON_TYPES = { Vandal: 'Rifle', Phantom: 'Rifle', Operator: 'Sniper', Sheriff: 'Sidearm', Spectre: 'SMG' };
+const PLACEMENTS = ['MVP', '2nd', '3rd', '4th', '5th'];
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-// added this
+// ── Generate one fake match (now includes agent / weapon / shot breakdown) ──
 const generateFakeMatch = () => {
-    const kills = rand(10, 35);
-    const deaths = rand(8, 25);
-    const assists = rand(2, 12);
-    const result = Math.random() > 0.4 ? 'W' : 'L';
-    const score = result === 'W' ? `13:${rand(0, 10)}` : `${rand(5, 12)}:13`;
-    return {
-      date: 'Today',
-      map: maps[rand(0, maps.length - 1)],
-      result,
-      score,
-      kd: parseFloat((kills / deaths).toFixed(1)),
-      kda: `${kills}/${deaths}/${assists}`,
-      ddDelta: rand(-50, 150),
-      hs: rand(20, 55),
-      acs: rand(180, 450),
-      placement: placements[rand(0, placements.length - 1)],
-    };
-  };
+  const kills  = rand(10, 35);
+  const deaths = rand(8, 25);
+  const assists = rand(2, 12);
+  const result  = Math.random() > 0.4 ? 'W' : 'L';
+  const score   = result === 'W' ? `13:${rand(0, 10)}` : `${rand(5, 12)}:13`;
+  const hs      = rand(20, 55);
+  const legs    = rand(5, 20);
+  const body    = 100 - hs - legs;
 
+  return {
+    date:      'Today',
+    map:       MAPS[rand(0, MAPS.length - 1)],
+    agent:     AGENTS[rand(0, AGENTS.length - 1)],
+    weapon:    WEAPONS[rand(0, WEAPONS.length - 1)],
+    result,
+    score,
+    kd:        parseFloat((kills / deaths).toFixed(1)),
+    kda:       `${kills}/${deaths}/${assists}`,
+    kills,
+    deaths,
+    assists,
+    ddDelta:   rand(-50, 150),
+    hs,
+    body,
+    legs,
+    acs:       rand(180, 450),
+    placement: PLACEMENTS[rand(0, PLACEMENTS.length - 1)],
+    isWin:     result === 'W',
+  };
+};
+
+// ── Blend all player-level stats after a new match ──
+const blendPlayerStats = (prev, match) => {
+  const n = prev.matchesPlayed ?? 0; // matches BEFORE this one
+
+  // ── Stat cards ──
+  const newKd      = blend(prev.kdRatio,             match.kd,  n);
+  const newAcs     = blend(prev.stats?.acs,          match.acs, n);
+  const newHsPct   = blend(prev.headshotPercentage,  match.hs,  n);
+  const newBodyPct = blend(prev.bodyshotPercentage,  match.body, n);
+  const newLegsPct = blend(prev.legshotPercentage,   match.legs, n);
+
+  const newWins    = (prev.stats?.wins   ?? 0) + (match.isWin ? 1 : 0);
+  const newLosses  = (prev.stats?.losses ?? 0) + (match.isWin ? 0 : 1);
+  const newMatches = n + 1;
+  const newWinRate = ((newWins / newMatches) * 100).toFixed(1) + '%';
+
+  // ── Detailed stats ──
+  const newKills   = (prev.stats?.kills   ?? 0) + match.kills;
+  const newDeaths  = (prev.stats?.deaths  ?? 0) + match.deaths;
+  const newAssists = (prev.stats?.assists ?? 0) + match.assists;
+  const newKadRatio = parseFloat(
+    ((newKills + newAssists) / Math.max(newDeaths, 1)).toFixed(2)
+  );
+  const newKillsPerRound = parseFloat((newKills / (newMatches * 13)).toFixed(2)); // approx 13 rounds
+
+  // ── Top Agents ──
+  const topAgents = blendTopAgents(prev.topAgents ?? [], match);
+
+  // ── Top Maps ──
+  const topMaps = blendTopMaps(prev.topMaps ?? [], match);
+
+  // ── Top Weapons ──
+  const topWeapons = blendTopWeapons(prev.topWeapons ?? [], match);
+
+  return {
+    ...prev,
+    matchesPlayed: newMatches,
+    kdRatio:            newKd,
+    winRate:            newWinRate,
+    headshotPercentage: newHsPct,
+    bodyshotPercentage: newBodyPct,
+    legshotPercentage:  newLegsPct,
+    stats: {
+      ...prev.stats,
+      wins:    newWins,
+      losses:  newLosses,
+      kills:   newKills,
+      deaths:  newDeaths,
+      assists: newAssists,
+      acs:     newAcs,
+    },
+    kadRatio:      newKadRatio,
+    killsPerRound: newKillsPerRound,
+    topAgents,
+    topMaps,
+    topWeapons,
+  };
+};
+
+// ── Blend top-agents list ──
+const blendTopAgents = (agents, match) => {
+  const existing = agents.find(a => a.name === match.agent);
+  if (existing) {
+    const n = existing.matches;
+    return agents.map(a => {
+      if (a.name !== match.agent) return a;
+      const newMatches = n + 1;
+      const wins = parseFloat(a.winRate) / 100 * n + (match.isWin ? 1 : 0);
+      return {
+        ...a,
+        matches: newMatches,
+        winRate: ((wins / newMatches) * 100).toFixed(1) + '%',
+        kd:      blend(a.kd, match.kd, n),
+        acs:     blend(a.acs === 'N/A' ? match.acs : a.acs, match.acs, n),
+      };
+    });
+  }
+  // new agent — append (cap list at 5)
+  const newAgent = {
+    name:    match.agent,
+    hours:   'N/A',
+    matches: 1,
+    winRate: match.isWin ? '100.0%' : '0.0%',
+    kd:      match.kd,
+    acs:     match.acs,
+  };
+  return [...agents, newAgent].slice(0, 5);
+};
+
+// ── Blend top-maps list ──
+const blendTopMaps = (maps, match) => {
+  const existing = maps.find(m => m.map === match.map);
+  if (existing) {
+    const newWins   = existing.wins   + (match.isWin ? 1 : 0);
+    const newLosses = existing.losses + (match.isWin ? 0 : 1);
+    const total     = newWins + newLosses;
+    return maps.map(m =>
+      m.map !== match.map ? m : {
+        ...m,
+        wins:    newWins,
+        losses:  newLosses,
+        winRate: ((newWins / total) * 100).toFixed(1) + '%',
+      }
+    );
+  }
+  const newMap = {
+    map:     match.map,
+    wins:    match.isWin ? 1 : 0,
+    losses:  match.isWin ? 0 : 1,
+    winRate: match.isWin ? '100.0%' : '0.0%',
+  };
+  return [...maps, newMap].slice(0, 5);
+};
+
+// ── Blend top-weapons list ──
+const blendTopWeapons = (weapons, match) => {
+  const existing = weapons.find(w => w.weapon === match.weapon);
+  if (existing) {
+    const n = existing.kills; // weight by total kills
+    return weapons.map(w => {
+      if (w.weapon !== match.weapon) return w;
+      const newKills = w.kills + match.kills;
+      return {
+        ...w,
+        kills:       newKills,
+        headshotPct: blend(parseFloat(w.headshotPct), match.hs,   n).toFixed(1) + '%',
+        bodyPct:     blend(parseFloat(w.bodyPct),     match.body, n).toFixed(1) + '%',
+        legsPct:     blend(parseFloat(w.legsPct),     match.legs, n).toFixed(1) + '%',
+      };
+    });
+  }
+  const newWeapon = {
+    weapon:      match.weapon,
+    type:        WEAPON_TYPES[match.weapon] ?? '',
+    kills:       match.kills,
+    headshotPct: match.hs   + '%',
+    bodyPct:     match.body + '%',
+    legsPct:     match.legs + '%',
+  };
+  return [...weapons, newWeapon].slice(0, 5);
+};
+
+
+// ─────────────────────────────────────────────
+const PlayerProfileView = () => {
+  const [player,        setPlayer]        = useState(null);
+  const [loading,       setLoading]       = useState(true);
+  const [justUpdated,   setJustUpdated]   = useState(false);
+  const [spinning,      setSpinning]      = useState(false);
+
+  // ── Simulate button handler ──
   const handleSimulateMatch = () => {
     setSpinning(true);
     setTimeout(() => {
-      const newMatch = generateFakeMatch();
-      setPlayer(prev => ({
-        ...prev,
-        recentMatches: [newMatch, ...(prev.recentMatches ?? []).slice(0, 19)],
-      }));
+      const match = generateFakeMatch();
+
+      setPlayer(prev => {
+        const blended = blendPlayerStats(prev, match);
+        return {
+          ...blended,
+          recentMatches: [match, ...(prev.recentMatches ?? []).slice(0, 19)],
+        };
+      });
+
       setSpinning(false);
       setJustUpdated(true);
       setTimeout(() => setJustUpdated(false), 2500);
@@ -76,42 +244,33 @@ const generateFakeMatch = () => {
         const res = await getUser(_id);
         const raw = res.data;
 
-        // Adapt DB shape → what the JSX expects
         const adapted = {
           ...raw,
-
-          // Fields not yet in DB — show fallback values
-          valorantId: raw.username, // not in player schema
+          valorantId: raw.username,
           team:       raw.teamId ?? 'No Team',
           playtime:   'N/A',
           peakRank:   raw.rank,
           peakRR:     raw.rr,
-
-          // Computed stats not yet in DB
-          damagePerRound: 'N/A',
-          kast:           'N/A',
-          killsPerRound:  raw.stats?.kills && raw.matchesPlayed
-                            ? (raw.stats.kills / raw.matchesPlayed).toFixed(2)
-                            : 'N/A',
+          damagePerRound:  'N/A',
+          kast:            'N/A',
+          killsPerRound:   raw.stats?.kills && raw.matchesPlayed
+                             ? (raw.stats.kills / raw.matchesPlayed).toFixed(2)
+                             : 'N/A',
           ddDeltaPerRound: 'N/A',
           roundWinRate:    'N/A',
-
-          // roles doesn't exist yet — empty array so .map() won't crash
           roles: [],
 
-          // topAgents: reshape populated agent objects
           topAgents: (raw.topAgents ?? []).map(a => ({
-            name:     a.agent?.name    ?? 'Unknown',
-            hours:    'N/A',
-            matches:  a.matchesPlayed  ?? 0,
-            winRate:  a.matchesPlayed
-                        ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%'
-                        : '0%',
-            kd:       a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
-            acs:      'N/A',
+            name:    a.agent?.name   ?? 'Unknown',
+            hours:   'N/A',
+            matches: a.matchesPlayed ?? 0,
+            winRate: a.matchesPlayed
+                       ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%'
+                       : '0%',
+            kd:      a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
+            acs:     'N/A',
           })),
 
-          // topWeapons: reshape populated weapon objects
           topWeapons: (raw.topWeapons ?? []).map(w => {
             const total = (w.headshotKills ?? 0) + (w.bodyshotKills ?? 0) + (w.legshotKills ?? 0);
             return {
@@ -124,28 +283,34 @@ const generateFakeMatch = () => {
             };
           }),
 
-          // topMaps: reshape populated map objects
           topMaps: (raw.topMaps ?? []).map(m => ({
             map:     m.map?.name ?? 'Unknown',
             wins:    m.wins      ?? 0,
             losses:  m.losses    ?? 0,
             winRate: m.matchesPlayed
-                      ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%'
-                      : '0%',
+                       ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%'
+                       : '0%',
           })),
 
-          // last20Matches → recentMatches (reshape for the table)
           recentMatches: (raw.last20Matches ?? []).map(m => ({
-            date:      m.match?.date   ?? 'N/A',
-            map:       m.match?.map    ?? 'N/A',
+            date:      m.match?.date      ?? 'N/A',
+            map:       m.match?.map       ?? 'N/A',
+            agent:     m.match?.agent     ?? 'N/A',
+            weapon:    m.match?.weapon    ?? 'N/A',
             result:    m.result === 'Win' ? 'W' : 'L',
-            score:     m.match?.score  ?? 'N/A',
-            kd:        m.match?.kd     ?? 0,
-            kda:       m.match?.kda    ?? 'N/A',
-            ddDelta:   m.match?.ddDelta ?? 0,
-            hs:        m.match?.hs     ?? 0,
-            acs:       m.match?.acs    ?? 0,
+            score:     m.match?.score     ?? 'N/A',
+            kd:        m.match?.kd        ?? 0,
+            kda:       m.match?.kda       ?? 'N/A',
+            kills:     m.match?.kills     ?? 0,
+            deaths:    m.match?.deaths    ?? 0,
+            assists:   m.match?.assists   ?? 0,
+            ddDelta:   m.match?.ddDelta   ?? 0,
+            hs:        m.match?.hs        ?? 0,
+            body:      m.match?.body      ?? 0,
+            legs:      m.match?.legs      ?? 0,
+            acs:       m.match?.acs       ?? 0,
             placement: m.match?.placement ?? 'N/A',
+            isWin:     m.result === 'Win',
           })),
         };
 
@@ -161,35 +326,30 @@ const generateFakeMatch = () => {
   }, []);
 
   if (loading) return <div style={{ color: '#fff', padding: 40 }}>Loading...</div>;
-  if (!player) return <div style={{ color: '#fff', padding: 40 }}>No player data found.</div>;
+  if (!player)  return <div style={{ color: '#fff', padding: 40 }}>No player data found.</div>;
 
   return (
     <div style={styles.page}>
-      {/* ── HEADER ── */}
-      <Navbar  />
+      <Navbar />
 
       <div style={styles.body}>
 
         {/* ── PROFILE BANNER ── */}
         <div style={styles.profileBanner}>
           <div style={styles.bannerLeft}>
-            {/* Changed this */}
             <img
               src={player.imageURL || '/default-avatar.png'}
               alt={player.username}
               style={styles.bannerAvatar}
-              onError={(e) => { 
-                e.target.onerror = null; // prevents looping
-                e.target.src = '/default-avatar.png'; 
-              }}
+              onError={(e) => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }}
             />
             <div>
               <div style={styles.bannerName}>{player.username}</div>
-              <div style={styles.bannerTag}>{player.valorantId}</div> {/* not in player schema */}
+              <div style={styles.bannerTag}>{player.valorantId}</div>
               <div style={styles.bannerMeta}>
                 <span style={styles.metaBadge}>{player.team}</span>
                 <span style={styles.metaBadge}>LVL {player.level}</span>
-                <span style={styles.metaBadge}>{player.playtime} · {player.matches} matches</span>
+                <span style={styles.metaBadge}>{player.playtime} · {player.matchesPlayed} matches</span>
               </div>
             </div>
           </div>
@@ -204,12 +364,12 @@ const generateFakeMatch = () => {
         {/* ── STAT CARDS ROW ── */}
         <div style={styles.statCardsRow}>
           {[
-            { label: 'K/D RATIO', value: player.kdRatio, sub: 'Top 9.0%' },
-            { label: 'WIN RATE', value: player.winRate, sub: `${player.stats.wins}W - ${player.stats.losses}L` },
-            { label: 'ACS', value: player.stats.acs, sub: 'Top 7.0%' },
-            { label: 'HEADSHOT %', value: player.headshotPercentage, sub: 'Top 3.1%' },
-            { label: 'DMG/ROUND', value: player.damagePerRound, sub: 'Top 7.0%' },
-            { label: 'KAST', value: player.kast, sub: 'Top 19.0%' },
+            { label: 'K/D RATIO',   value: player.kdRatio,             sub: 'Top 9.0%'  },
+            { label: 'WIN RATE',    value: player.winRate,             sub: `${player.stats.wins}W - ${player.stats.losses}L` },
+            { label: 'ACS',         value: player.stats.acs,           sub: 'Top 7.0%'  },
+            { label: 'HEADSHOT %',  value: player.headshotPercentage + '%', sub: 'Top 3.1%' },
+            { label: 'DMG/ROUND',   value: player.damagePerRound,      sub: 'Top 7.0%'  },
+            { label: 'KAST',        value: player.kast,                sub: 'Top 19.0%' },
           ].map((s) => (
             <div key={s.label} style={styles.statCard}>
               <div style={styles.statCardLabel}>{s.label}</div>
@@ -223,16 +383,16 @@ const generateFakeMatch = () => {
         <div style={styles.sectionTitle}><TrendingUp size={14} color="#ff4655" style={{ marginRight: 8 }} />DETAILED STATS</div>
         <div style={styles.detailGrid}>
           {[
-            { label: 'Kills', value: player.stats.kills },
-            { label: 'Deaths', value: player.stats.deaths },
-            { label: 'Assists', value: player.stats.assists },
-            { label: 'KAD Ratio', value: player.kadRatio },
-            { label: 'Kills/Round', value: player.killsPerRound },
-            { label: 'First Bloods', value: player.stats.firstBloods },
-            { label: 'Flawless Rounds', value: player.stats.flawlessRounds },
-            { label: 'Aces', value: player.stats.aces },
-            { label: 'DD∆/Round', value: player.ddDeltaPerRound },
-            { label: 'Round Win %', value: player.roundWinRate },
+            { label: 'Kills',          value: player.stats.kills         },
+            { label: 'Deaths',         value: player.stats.deaths        },
+            { label: 'Assists',        value: player.stats.assists       },
+            { label: 'KAD Ratio',      value: player.kadRatio            },
+            { label: 'Kills/Round',    value: player.killsPerRound       },
+            { label: 'First Bloods',   value: player.stats.firstBloods   },
+            { label: 'Flawless Rounds',value: player.stats.flawlessRounds},
+            { label: 'Aces',           value: player.stats.aces          },
+            { label: 'DD∆/Round',      value: player.ddDeltaPerRound     },
+            { label: 'Round Win %',    value: player.roundWinRate        },
           ].map((s) => (
             <div key={s.label} style={styles.detailItem}>
               <div style={styles.detailLabel}>{s.label}</div>
@@ -243,14 +403,12 @@ const generateFakeMatch = () => {
 
         {/* ── TWO COLUMN: ACCURACY + ROLES ── */}
         <div style={styles.twoCol}>
-
-          {/* Accuracy */}
           <div style={styles.card}>
             <div style={styles.cardTitle}><Crosshair size={13} color="#ff4655" style={{ marginRight: 7 }} />ACCURACY</div>
             {[
               { zone: 'Head', pct: player.headshotPercentage + '%', color: '#ff4655' },
               { zone: 'Body', pct: player.bodyshotPercentage + '%', color: '#38bdf8' },
-              { zone: 'Legs', pct: player.legshotPercentage + '%', color: '#888' },
+              { zone: 'Legs', pct: player.legshotPercentage  + '%', color: '#888'    },
             ].map((a) => (
               <div key={a.zone} style={styles.accuracyRow}>
                 <span style={styles.accuracyLabel}>{a.zone}</span>
@@ -262,7 +420,6 @@ const generateFakeMatch = () => {
             ))}
           </div>
 
-          {/* Roles */}
           <div style={styles.card}>
             <div style={styles.cardTitle}><Shield size={13} color="#ff4655" style={{ marginRight: 7 }} />ROLES</div>
             {player.roles.map((r) => (
@@ -282,17 +439,11 @@ const generateFakeMatch = () => {
 
         {/* ── TWO COLUMN: TOP AGENTS + TOP MAPS ── */}
         <div style={styles.twoCol}>
-
-          {/* Top Agents */}
           <div style={styles.card}>
             <div style={styles.cardTitle}><User size={13} color="#ff4655" style={{ marginRight: 7 }} />TOP AGENTS</div>
             <table style={styles.miniTable}>
               <thead>
-                <tr>
-                  {['AGENT', 'MATCHES', 'WIN%', 'K/D', 'ACS'].map(h => (
-                    <th key={h} style={styles.miniTh}>{h}</th>
-                  ))}
-                </tr>
+                <tr>{['AGENT','MATCHES','WIN%','K/D','ACS'].map(h => <th key={h} style={styles.miniTh}>{h}</th>)}</tr>
               </thead>
               <tbody>
                 {player.topAgents.map((a) => (
@@ -311,7 +462,6 @@ const generateFakeMatch = () => {
             </table>
           </div>
 
-          {/* Top Maps */}
           <div style={styles.card}>
             <div style={styles.cardTitle}><Map size={13} color="#ff4655" style={{ marginRight: 7 }} />TOP MAPS</div>
             {player.topMaps.map((m) => (
@@ -347,7 +497,7 @@ const generateFakeMatch = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['DATE', 'MAP', 'RESULT', 'SCORE', 'K/D', 'K/D/A', 'DD∆', 'HS%', 'ACS', 'PLACE'].map(h => (
+                {['DATE','MAP','RESULT','SCORE','K/D','K/D/A','DD∆','HS%','ACS','PLACE'].map(h => (
                   <th key={h} style={styles.matchTh}>{h}</th>
                 ))}
               </tr>
@@ -370,11 +520,11 @@ const generateFakeMatch = () => {
             </tbody>
           </table>
         </div>
-      
-        {/* ── SIMULATE MATCH BUTTON ── */} {/* ADDED THIS*/}
+
+        {/* ── SIMULATE MATCH BUTTON ── */}
         <div style={styles.simulateSection}>
           {justUpdated && (
-            <div style={styles.successMsg}>✓ Match simulated — stats updated!</div>
+            <div style={styles.successMsg}>✓ Match simulated — all stats updated!</div>
           )}
           <button
             style={{ ...styles.simulateBtn, opacity: spinning ? 0.7 : 1 }}
@@ -384,13 +534,12 @@ const generateFakeMatch = () => {
             <RefreshCw size={15} style={{ marginRight: 8, animation: spinning ? 'spin 0.8s linear infinite' : 'none' }} />
             {spinning ? 'SIMULATING MATCH...' : 'SIMULATE NEW MATCH'}
           </button>
-          <p style={styles.simulateNote}>Dev tool — simulates a completed match and updates all stats</p>
+          <p style={styles.simulateNote}>Dev tool — simulates a completed match and blends all stats</p>
         </div>
       </div>
 
-    {/* ADDED THIS*/}
       <style>{`
-      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
@@ -404,94 +553,69 @@ const styles = {
     color: '#ccc',
   },
   header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 32px',
-    height: 60,
-    background: '#0f1117',
-    borderBottom: '1px solid #1a1f2e',
-    position: 'sticky',
-    top: 0,
-    zIndex: 10,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '0 32px', height: 60, background: '#0f1117',
+    borderBottom: '1px solid #1a1f2e', position: 'sticky', top: 0, zIndex: 10,
   },
-  logoRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  logoIcon: { background: 'rgba(255,70,85,0.12)', borderRadius: 6, padding: '3px 5px', display: 'flex' },
-  logoText: { fontSize: 17, fontWeight: 900, color: '#fff', letterSpacing: 2 },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
-  headerName: { fontSize: 13, color: '#888', letterSpacing: 1 },
-  avatar: { width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', border: '2px solid #ff4655' },
-  avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
-
-body: { padding: '28px 40px' },
-
+  body: { padding: '28px 40px' },
   profileBanner: {
-    background: '#0f1117',
-    border: '1px solid #1a1f2e',
-    borderRadius: 10,
-    padding: '24px 28px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 10,
+    padding: '24px 28px', display: 'flex', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 20,
   },
-  bannerLeft: { display: 'flex', alignItems: 'center', gap: 20 },
+  bannerLeft:   { display: 'flex', alignItems: 'center', gap: 20 },
   bannerAvatar: { width: 72, height: 72, borderRadius: '50%', border: '3px solid #ff4655', objectFit: 'cover' },
-  bannerName: { fontSize: 28, fontWeight: 900, color: '#fff', letterSpacing: 2 },
-  bannerTag: { fontSize: 13, color: '#555', letterSpacing: 1, marginBottom: 8 },
-  bannerMeta: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  metaBadge: { background: 'rgba(255,70,85,0.08)', border: '1px solid rgba(255,70,85,0.2)', borderRadius: 4, padding: '3px 8px', fontSize: 11, color: '#888', letterSpacing: 1 },
+  bannerName:   { fontSize: 28, fontWeight: 900, color: '#fff', letterSpacing: 2 },
+  bannerTag:    { fontSize: 13, color: '#555', letterSpacing: 1, marginBottom: 8 },
+  bannerMeta:   { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  metaBadge: {
+    background: 'rgba(255,70,85,0.08)', border: '1px solid rgba(255,70,85,0.2)',
+    borderRadius: 4, padding: '3px 8px', fontSize: 11, color: '#888', letterSpacing: 1,
+  },
   bannerRank: { textAlign: 'right' },
-
-  statCardsRow: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 20, width: '100%' },
-  statCard: { background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 8, padding: '14px 12px', textAlign: 'center' },
+  statCardsRow: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 20 },
+  statCard:      { background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 8, padding: '14px 12px', textAlign: 'center' },
   statCardLabel: { fontSize: 10, color: '#555', letterSpacing: 2, marginBottom: 6 },
   statCardValue: { fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: 1 },
-  statCardSub: { fontSize: 10, color: '#ff4655', marginTop: 4, letterSpacing: 1 },
-
+  statCardSub:   { fontSize: 10, color: '#ff4655', marginTop: 4, letterSpacing: 1 },
   sectionTitle: {
-    display: 'flex', alignItems: 'center',
-    fontSize: 13, fontWeight: 700, color: '#555', letterSpacing: 2,
-    marginBottom: 10, marginTop: 20,
+    display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 700,
+    color: '#555', letterSpacing: 2, marginBottom: 10, marginTop: 20,
   },
-
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20, width: '100%' },
-  detailItem: { background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 8, padding: '12px 14px' },
+  detailGrid:  { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 },
+  detailItem:  { background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 8, padding: '12px 14px' },
   detailLabel: { fontSize: 10, color: '#555', letterSpacing: 1, marginBottom: 4 },
   detailValue: { fontSize: 18, fontWeight: 900, color: '#fff' },
-
-  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12, width: '100%' },
-  card: { background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 10, padding: '18px 20px' },
+  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 },
+  card:      { background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 10, padding: '18px 20px' },
   cardTitle: { display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 700, color: '#555', letterSpacing: 2, marginBottom: 14 },
-
-  accuracyRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
-  accuracyLabel: { fontSize: 12, color: '#666', width: 36 },
-  accuracyBarWrap: { flex: 1, height: 6, background: '#1a1f2e', borderRadius: 3, overflow: 'hidden' },
-  accuracyBar: { height: '100%', borderRadius: 3, transition: 'width 0.4s' },
-  accuracyPct: { fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' },
-
+  accuracyRow:    { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
+  accuracyLabel:  { fontSize: 12, color: '#666', width: 36 },
+  accuracyBarWrap:{ flex: 1, height: 6, background: '#1a1f2e', borderRadius: 3, overflow: 'hidden' },
+  accuracyBar:    { height: '100%', borderRadius: 3, transition: 'width 0.4s' },
+  accuracyPct:    { fontSize: 12, fontWeight: 700, width: 40, textAlign: 'right' },
   roleRow: { display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', paddingBottom: 10, marginBottom: 10 },
-
   miniTable: { width: '100%', borderCollapse: 'collapse' },
   miniTh: { fontSize: 10, color: '#555', letterSpacing: 1, textAlign: 'left', paddingBottom: 8, fontWeight: 700 },
   miniTd: { fontSize: 13, color: '#888', padding: '8px 0', borderBottom: '1px solid #1a1f2e' },
-
   mapRow: { display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', padding: '10px 0' },
-
-  weaponsRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20, width: '100%' },  weaponCard: { background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 10, padding: '18px 20px' },
-  weaponKills: { fontSize: 24, fontWeight: 900, color: '#fff', marginBottom: 8 },
+  weaponsRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 },
+  weaponCard:   { background: '#0f1117', border: '1px solid #1a1f2e', borderRadius: 10, padding: '18px 20px' },
+  weaponKills:  { fontSize: 24, fontWeight: 900, color: '#fff', marginBottom: 8 },
   weaponAccRow: { display: 'flex', gap: 12, fontSize: 12, fontWeight: 700 },
-
   matchTh: { fontSize: 10, color: '#555', letterSpacing: 1, textAlign: 'left', paddingBottom: 10, fontWeight: 700 },
   matchTd: { fontSize: 13, color: '#888', padding: '10px 0', borderBottom: '1px solid #1a1f2e' },
   matchRow: { transition: 'background 0.15s' },
-
-  // added this
   simulateSection: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0 20px', gap: 10 },
-  successMsg: { fontSize: 13, color: '#22c55e', letterSpacing: 2, fontWeight: 700 },
-  simulateBtn: { display: 'flex', alignItems: 'center', background: 'rgba(255,70,85,0.1)', border: '1px solid rgba(255,70,85,0.3)', color: '#ff4655', borderRadius: 8, padding: '12px 28px', fontSize: 13, fontWeight: 900, letterSpacing: 2, cursor: 'pointer', fontFamily: "'Barlow Condensed', sans-serif", transition: 'background 0.2s' },
+  successMsg:  { fontSize: 13, color: '#22c55e', letterSpacing: 2, fontWeight: 700 },
+  simulateBtn: {
+    display: 'flex', alignItems: 'center',
+    background: 'rgba(255,70,85,0.1)', border: '1px solid rgba(255,70,85,0.3)',
+    color: '#ff4655', borderRadius: 8, padding: '12px 28px',
+    fontSize: 13, fontWeight: 900, letterSpacing: 2, cursor: 'pointer',
+    fontFamily: "'Barlow Condensed', sans-serif", transition: 'background 0.2s',
+  },
   simulateNote: { fontSize: 11, color: '#333', letterSpacing: 1 },
-  statCardFlash: { borderColor: '#ff4655' },
 };
 
 export default PlayerProfileView;

@@ -4,17 +4,17 @@ import { getAllPlayers } from '../services/UserApi';
 import { Search, Shield, User, ChevronRight, ChevronLeft, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
 
 const loggedInUser = JSON.parse(localStorage.getItem('user'));
+const userRole = localStorage.getItem('userRole'); // 'coach' or 'player'
 
 const rankColor = (rank) => {
   if (!rank) return '#888';
-  if (rank.includes('RADIANT'))  return '#ffffa0';
+  if (rank.includes('RADIANT')) return '#ffffa0';
   if (rank.includes('IMMORTAL')) return '#ff4655';
-  if (rank.includes('DIAMOND'))  return '#a78bfa';
+  if (rank.includes('DIAMOND')) return '#a78bfa';
   if (rank.includes('PLATINUM')) return '#38bdf8';
   return '#888';
 };
 
-// FIX 1: r.player is a populated object { username: '...' } not a plain string
 const getRequestStatus = (playerName, requests = []) => {
   const found = requests.find(r => r.player?.username === playerName);
   if (!found) return 'none';
@@ -36,11 +36,11 @@ const TeamSearchView = () => {
   const [requests, setRequests] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // BUG 1 FIX: only fetch requests if logged in as coach
   useEffect(() => {
     const fetchRequests = async () => {
       try {
         const token = localStorage.getItem('token');
-        // Filter by coachId so coach only sees their own requests
         const res = await fetch(`/api/requests?coachId=${loggedInUser._id}`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -52,7 +52,8 @@ const TeamSearchView = () => {
         setRequests([]);
       }
     };
-    if (loggedInUser?.role === 'Coach') fetchRequests();
+    // BUG 1 FIX: was loggedInUser?.role === 'Coach' — now uses userRole from localStorage
+    if (userRole === 'coach') fetchRequests();
   }, []);
 
   useEffect(() => {
@@ -69,12 +70,12 @@ const TeamSearchView = () => {
     fetchPlayers();
   }, []);
 
-  // Send a new request
   const handleRequest = async (player) => {
-    try {
-      const status = getRequestStatus(player.username, requests);
-      if (status !== 'none') return;
+    // BUG 4 FIX: only block if Pending or Approved — allow re-request after Rejection
+    const status = getRequestStatus(player.username, requests);
+    if (status === 'Pending' || status === 'Approved') return;
 
+    try {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/requests/${loggedInUser._id}/send`, {
         method: 'POST',
@@ -95,22 +96,24 @@ const TeamSearchView = () => {
 
       const newRequest = await res.json();
 
-      // Store player as { username } object to match getRequestStatus expectations
-      setRequests(prev => [
-        ...prev,
-        {
-          _id: newRequest._id,
-          player: { username: player.username },
-          team: { teamName: loggedInUser.teamName },
-          status: 'Pending',
-        },
-      ]);
+      // If a rejected request existed for this player, replace it
+      setRequests(prev => {
+        const filtered = prev.filter(r => r.player?.username !== player.username);
+        return [
+          ...filtered,
+          {
+            _id: newRequest._id,
+            player: { username: player.username },
+            team: { teamName: loggedInUser.teamName },
+            status: 'Pending',
+          },
+        ];
+      });
     } catch (err) {
       console.error('Failed to send request:', err);
     }
   };
 
-  // FIX 3: Cancel a pending request — calls the existing DELETE /reject endpoint
   const handleCancel = async (player) => {
     try {
       const requestId = getRequestId(player.username, requests);
@@ -124,7 +127,7 @@ const TeamSearchView = () => {
 
       if (!res.ok) throw new Error('Failed to cancel request');
 
-      // Remove from local state — button reverts to REQUEST
+      // Revert button to REQUEST state
       setRequests(prev => prev.filter(r => r._id !== requestId));
     } catch (err) {
       console.error('Failed to cancel request:', err);
@@ -213,10 +216,10 @@ const TeamSearchView = () => {
                 </div>
                 <div style={styles.cardStats}>
                   {[
-                    { label: 'K/D',  value: player.kdRatio },
+                    { label: 'K/D', value: player.kdRatio },
                     { label: 'WIN%', value: player.winRate },
-                    { label: 'ACS',  value: player.stats?.acs },
-                    { label: 'HS%',  value: player.headshotPercentage },
+                    { label: 'ACS', value: player.stats?.acs },
+                    { label: 'HS%', value: player.headshotPercentage },
                   ].map(s => (
                     <div key={s.label} style={styles.statItem}>
                       <div style={styles.statLabel}>{s.label}</div>
@@ -273,7 +276,6 @@ const TeamSearchView = () => {
           <div style={modal.box} onClick={e => e.stopPropagation()}>
             <div style={modal.header}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                {/* FIX 2: was selected.avatar — correct field is selected.imageURL */}
                 <img
                   src={selected.imageURL || '/default-avatar.png'}
                   alt={selected.username}
@@ -290,7 +292,8 @@ const TeamSearchView = () => {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {loggedInUser?.role === 'Coach' && (
+                {/* BUG 1 FIX: only coaches see the request button */}
+                {userRole === 'coach' && (
                   <RequestButton
                     status={getRequestStatus(selected.username, requests)}
                     onClick={() => handleRequest(selected)}
@@ -305,14 +308,14 @@ const TeamSearchView = () => {
 
             <div style={modal.statsGrid}>
               {[
-                { label: 'K/D',      value: selected.kdRatio },
+                { label: 'K/D', value: selected.kdRatio },
                 { label: 'WIN RATE', value: selected.winRate },
-                { label: 'ACS',      value: selected.stats?.acs },
-                { label: 'HS%',      value: selected.headshotPercentage },
-                { label: 'KAST',     value: 'N/A' },
-                { label: 'DMG/RND',  value: 'N/A' },
-                { label: 'KILLS',    value: selected.stats?.kills },
-                { label: 'MATCHES',  value: (selected.stats?.wins ?? 0) + (selected.stats?.losses ?? 0) },
+                { label: 'ACS', value: selected.stats?.acs },
+                { label: 'HS%', value: selected.headshotPercentage },
+                { label: 'KAST', value: 'N/A' },
+                { label: 'DMG/RND', value: 'N/A' },
+                { label: 'KILLS', value: selected.stats?.kills },
+                { label: 'MATCHES', value: (selected.stats?.wins ?? 0) + (selected.stats?.losses ?? 0) },
               ].map(s => (
                 <div key={s.label} style={modal.statBox}>
                   <div style={{ fontSize: 10, color: '#555', letterSpacing: 1 }}>{s.label}</div>
@@ -354,7 +357,6 @@ const TeamSearchView = () => {
   );
 };
 
-// FIX 3: PENDING button is now clickable — hovering shows CANCEL state
 const RequestButton = ({ status, onClick, onCancel }) => {
   const [hovering, setHovering] = useState(false);
 
@@ -382,6 +384,7 @@ const RequestButton = ({ status, onClick, onCancel }) => {
     );
   }
 
+  // status === 'none' or 'Rejected' — show REQUEST button
   return (
     <button style={{ ...reqBtn.base, ...reqBtn.request }} onClick={onClick}>
       <UserPlus size={13} style={{ marginRight: 6 }} /> REQUEST
@@ -397,10 +400,10 @@ const reqBtn = {
     fontFamily: "'Barlow Condensed', sans-serif",
     cursor: 'default', border: 'none',
   },
-  request:  { background: 'rgba(255,70,85,0.15)',  border: '1px solid rgba(255,70,85,0.35)',  color: '#ff4655', cursor: 'pointer' },
-  pending:  { background: 'rgba(245,158,11,0.1)',  border: '1px solid rgba(245,158,11,0.3)',  color: '#f59e0b' },
-  cancel:   { background: 'rgba(255,70,85,0.1)',   border: '1px solid rgba(255,70,85,0.35)',  color: '#ff4655' },
-  approved: { background: 'rgba(34,197,94,0.1)',   border: '1px solid rgba(34,197,94,0.3)',   color: '#22c55e' },
+  request: { background: 'rgba(255,70,85,0.15)', border: '1px solid rgba(255,70,85,0.35)', color: '#ff4655', cursor: 'pointer' },
+  pending: { background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b' },
+  cancel: { background: 'rgba(255,70,85,0.1)', border: '1px solid rgba(255,70,85,0.35)', color: '#ff4655' },
+  approved: { background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e' },
 };
 
 const styles = {
