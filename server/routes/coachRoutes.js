@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { getPlayers, assignPlayer, getAggregatedStats } = require('../controllers/coachController');
+const { getPlayers, assignPlayer, getAggregatedStats, getCoachById } = require('../controllers/coachController');
 
+// Get coach
+router.get('/:id', getCoachById);  // ← add this
 // Get all players assigned to a coach
 router.get('/:id/players', getPlayers);
 // Assign a player to a coach

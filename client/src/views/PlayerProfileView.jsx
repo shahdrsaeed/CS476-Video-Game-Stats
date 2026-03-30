@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { getUser } from '../services/UserApi';
 import Navbar from '../components/Navbar';
+import { getPlayerStats } from '../services/UserApi';
 import axios from 'axios';
 
 // ── Rank color helper ──
@@ -67,7 +68,7 @@ const blendPlayerStats = (prev, match) => {
   const n = prev.matchesPlayed ?? 0;
 
   const newKd      = blend(prev.kdRatio,            match.kd,   n);
-  const newAcs     = blend(prev.acs,                match.acs,  n);
+  const newAcs     = blend(prev.acs,                match.acs,  n); 
   const newHsPct   = blend(prev.headshotPercentage, match.hs,   n);
   const newBodyPct = blend(prev.bodyshotPercentage, match.body, n);
   const newLegsPct = blend(prev.legshotPercentage,  match.legs, n);
@@ -206,6 +207,7 @@ const PlayerProfileView = () => {
   const [justUpdated,   setJustUpdated]   = useState(false);
   const [spinning,      setSpinning]      = useState(false);
 
+  // modified function
   const handleSimulateMatch = async () => {
     if (!playerId) {
       setError('Player ID is missing');
@@ -221,7 +223,6 @@ const PlayerProfileView = () => {
       );
 
       const simulatedMatch = response.data.match;
-      const newStats = response.data.newStats;
 
       const mapResponse = await axios.get(
         `/api/maps/${simulatedMatch.map}`
@@ -230,10 +231,28 @@ const PlayerProfileView = () => {
 
       const adaptedMatch = adaptSimulatedMatch(simulatedMatch, playerId, mapName);
 
+      // ← Re-fetch fresh stats from backend instead of manually blending
+      const freshRes = await getPlayerStats(playerId);
+      const raw = freshRes.data;
+
       setPlayer(prev => ({
         ...prev,
-        stats: newStats,
-        recentMatches: [adaptedMatch, ...(prev.recentMatches || [])]
+        // Updated computed stats from backend
+        acs:             raw.acs ?? prev.acs,
+        damagePerRound:  raw.damagePerRound ?? prev.damagePerRound,
+        ddDeltaPerRound: raw.ddDeltaPerRound ?? prev.ddDeltaPerRound,
+        kast:            raw.kast ? raw.kast + '%' : prev.kast,
+        roundWinRate:    raw.roundWinPercentage ? raw.roundWinPercentage + '%' : prev.roundWinRate,
+        killsPerRound:   raw.killsPerRound ?? prev.killsPerRound,
+        kdRatio:         raw.kdRatio ?? prev.kdRatio,
+        winRate:         raw.winRate ?? prev.winRate,
+        headshotPercentage: raw.headshotPercentage ?? prev.headshotPercentage,
+        bodyshotPercentage: raw.bodyshotPercentage ?? prev.bodyshotPercentage,
+        legshotPercentage:  raw.legshotPercentage  ?? prev.legshotPercentage,
+        matchesPlayed:   raw.matchesPlayed ?? prev.matchesPlayed,
+        stats:           raw.stats ?? prev.stats,
+        // Add the adapted match to recent matches
+        recentMatches: [adaptedMatch, ...(prev.recentMatches || [])],
       }));
 
       setJustUpdated(true);
@@ -253,83 +272,85 @@ const PlayerProfileView = () => {
         const stored = localStorage.getItem('user');
         if (!stored) return;
 
-        const { _id } = JSON.parse(stored); // Extract the player ID from localStorage
+        const { _id } = JSON.parse(stored);
         setPlayerId(_id); // Store it in the state for later use
 
-        const res = await getUser(_id); // Fetch player data using the player ID
+        const res = await getPlayerStats(_id); // ← use new endpoint
         const raw = res.data;
 
-        const adapted = {
-          ...raw,
-          valorantId: raw.username,
-          team:       raw.teamId ?? 'No Team',
-          playtime:   'N/A',
-          peakRank:   raw.rank,
-          peakRR:     raw.rr,
-          damagePerRound:  'N/A',
-          kast:            'N/A',
-          killsPerRound:   raw.stats?.kills && raw.matchesPlayed
-                             ? (raw.stats.kills / raw.matchesPlayed).toFixed(2)
-                             : 'N/A',
-          ddDeltaPerRound: 'N/A',
-          roundWinRate:    'N/A',
-          roles: [],
+const adapted = {
+  ...raw,
 
-          topAgents: (raw.topAgents ?? []).map(a => ({
-            name:    a.agent?.name   ?? 'Unknown',
-            hours:   'N/A',
-            matches: a.matchesPlayed ?? 0,
-            winRate: a.matchesPlayed
-                       ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%'
-                       : '0%',
-            kd:      a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
-            acs:     'N/A',
-          })),
+  // Field renames / reshapes
+  team:     raw.teamId?.teamName ?? 'No Team',
+  peakRank: raw.rank,
+  peakRR:   raw.rr,
 
-          topWeapons: (raw.topWeapons ?? []).map(w => {
-            const total = (w.headshotKills ?? 0) + (w.bodyshotKills ?? 0) + (w.legshotKills ?? 0);
-            return {
-              weapon: w.weapon?.name ?? 'Unknown',
-              type: w.weapon?.type ?? '',
-              kills: w.totalKills ?? 0,
-              headshotPct: total ? ((w.headshotKills / total) * 100).toFixed(1) + '%' : '0%',
-              bodyPct: total ? ((w.bodyshotKills / total) * 100).toFixed(1) + '%' : '0%',
-              legsPct: total ? ((w.legshotKills / total) * 100).toFixed(1) + '%' : '0%',
-            };
-          }),
+// Computed stats from backend
+  ddDeltaPerRound: raw.ddDeltaPerRound ?? 'N/A',
+  roundWinRate:    raw.roundWinPercentage ? raw.roundWinPercentage + '%' : 'N/A',
+  kast:            raw.kast ? raw.kast + '%' : 'N/A',
+  acs:             raw.acs ?? 'N/A',
+  damagePerRound:  raw.damagePerRound ?? 'N/A',
+  killsPerRound:   raw.killsPerRound  ?? 'N/A',
+  roles:           [],
 
-          topMaps: (raw.topMaps ?? []).map(m => ({
-            map:     m.map?.name ?? 'Unknown',
-            wins:    m.wins      ?? 0,
-            losses:  m.losses    ?? 0,
-            winRate: m.matchesPlayed
-                       ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%'
-                       : '0%',
-          })),
+  topWeapons: (raw.topWeapons ?? []).map(w => {
+    const total = (w.headshotKills ?? 0) + (w.bodyshotKills ?? 0) + (w.legshotKills ?? 0);
+    return {
+      weapon:      w.weapon?.name ?? 'Unknown',
+      type:        w.weapon?.type ?? '',
+      kills:       w.totalKills ?? 0,
+      headshotPct: total ? ((w.headshotKills / total) * 100).toFixed(1) + '%' : '0%',
+      bodyPct:     total ? ((w.bodyshotKills  / total) * 100).toFixed(1) + '%' : '0%',
+      legsPct:     total ? ((w.legshotKills   / total) * 100).toFixed(1) + '%' : '0%',
+    };
+  }),
 
-          recentMatches: (raw.last20Matches ?? []).map(m => ({
-            date:      m.match?.date      ?? 'N/A',
-            map:       m.match?.map       ?? 'N/A',
-            agent:     m.match?.agent     ?? 'N/A',
-            weapon:    m.match?.weapon    ?? 'N/A',
-            result:    m.result === 'Win' ? 'W' : 'L',
-            score:     m.match?.score     ?? 'N/A',
-            kd:        m.match?.kd        ?? 0,
-            kda:       m.match?.kda       ?? 'N/A',
-            kills:     m.match?.kills     ?? 0,
-            deaths:    m.match?.deaths    ?? 0,
-            assists:   m.match?.assists   ?? 0,
-            ddDelta:   m.match?.ddDelta   ?? 0,
-            hs:        m.match?.hs        ?? 0,
-            body:      m.match?.body      ?? 0,
-            legs:      m.match?.legs      ?? 0,
-            acs:       m.match?.acs       ?? 0,
-            placement: m.match?.placement ?? 'N/A',
-            isWin:     m.result === 'Win',
-          })),
-        };
+  topAgents: (raw.topAgents ?? []).map(a => ({
+    name:    a.agent?.name ?? 'Unknown',
+    hours:   'N/A',
+    matches: a.matchesPlayed ?? 0,
+    winRate: a.matchesPlayed ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%' : '0%',
+    kd:      a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
+    acs:     'N/A',
+  })),
 
-        setPlayer(adapted); // Set the player data
+  topMaps: (raw.topMaps ?? []).map(m => ({
+      map:     m.map?.name ?? 'Unknown',
+      wins:    m.wins ?? 0,
+      losses:  m.losses ?? 0,
+      winRate: m.matchesPlayed ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%' : '0%',
+    })),
+
+    recentMatches: (raw.last20Matches ?? []).map(m => {
+      const matchPlayer = (m.match?.players ?? []).find(
+        p => p.player?.toString() === raw._id?.toString()
+      );
+      const s = matchPlayer?.stats ?? {};
+      const totalHits = (s.headshots ?? 0) + (s.bodyshots ?? 0) + (s.legshots ?? 0);
+
+      return {
+        date:      m.match?.datePlayed ? new Date(m.match.datePlayed).toLocaleDateString() : 'N/A',
+        map:       m.match?.map?.name ?? 'N/A',
+        result:    m.result === 'Win' ? 'W' : 'L',
+        score:     m.match?.score ? `${m.match.score.teamA}:${m.match.score.teamB}` : 'N/A',
+        kills:     s.kills   ?? 'N/A',
+        deaths:    s.deaths  ?? 'N/A',
+        assists:   s.assists ?? 'N/A',
+        kd:        s.deaths  ? (s.kills / s.deaths).toFixed(2) : s.kills ?? 'N/A',
+        kda:       s.kills != null ? `${s.kills}/${s.deaths}/${s.assists}` : 'N/A',
+        hs:        totalHits ? ((s.headshots / totalHits) * 100).toFixed(1) : 'N/A',
+        ddDelta:   s.damageDealt != null && s.damageTaken != null
+                    ? s.damageDealt - s.damageTaken : 'N/A',
+        acs:       'N/A',
+        placement: 'N/A',
+        isWin:     m.result === 'Win',
+      };
+    }),
+  };
+
+      setPlayer(adapted);
       } catch (err) {
         console.error('Failed to fetch player:', err);
         setError('Failed to fetch player data');
@@ -378,11 +399,11 @@ const PlayerProfileView = () => {
             />
             <div>
               <div style={styles.bannerName}>{player.username}</div>
-              <div style={styles.bannerTag}>{player.valorantId}</div>
+              <div style={styles.bannerTag}>{player.role}</div>
               <div style={styles.bannerMeta}>
                 <span style={styles.metaBadge}>{player.team}</span>
                 <span style={styles.metaBadge}>LVL {player.level}</span>
-                <span style={styles.metaBadge}>{player.playtime} · {player.matchesPlayed} matches</span>
+                <span style={styles.metaBadge}>{player.matchesPlayed} matches</span>
               </div>
             </div>
           </div>
@@ -397,12 +418,12 @@ const PlayerProfileView = () => {
         {/* ── STAT CARDS ROW ── */}
         <div style={styles.statCardsRow}>
           {[
-            { label: 'K/D RATIO',   value: player.kdRatio,             sub: 'Top 9.0%'  },
-            { label: 'WIN RATE',    value: player.winRate,             sub: `${player.stats.wins}W - ${player.stats.losses}L` },
-            { label: 'ACS',         value: player.stats.acs,           sub: 'Top 7.0%'  },
-            { label: 'HEADSHOT %',  value: player.headshotPercentage + '%', sub: 'Top 3.1%' },
-            { label: 'DMG/ROUND',   value: player.damagePerRound,      sub: 'Top 7.0%'  },
-            { label: 'KAST',        value: player.kast,                sub: 'Top 19.0%' },
+            { label: 'K/D RATIO',  value: player.kdRatio,                sub: 'Top 9.0%'  },
+            { label: 'WIN RATE',   value: player.winRate,                 sub: `${player.stats.wins}W - ${player.stats.losses}L` },
+            { label: 'ACS',        value: player.acs,                     sub: 'Top 7.0%'  },
+            { label: 'HEADSHOT %', value: player.headshotPercentage + '%', sub: 'Top 3.1%' },
+            { label: 'DMG/ROUND',  value: player.damagePerRound,          sub: 'Top 7.0%'  },
+            { label: 'KAST',       value: player.kast,                    sub: 'Top 19.0%' },
           ].map((s) => (
             <div key={s.label} style={styles.statCard}>
               <div style={styles.statCardLabel}>{s.label}</div>

@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-import { getAllPlayers } from '../services/UserApi';
+import { getAllPlayers, getPlayerStats } from '../services/UserApi';
 import { Search, Shield, User, ChevronRight, ChevronLeft, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
-
-// const loggedInUser = JSON.parse(localStorage.getItem('user'));
-// const userRole = localStorage.getItem('userRole'); // 'coach' or 'player'
 
 const rankColor = (rank) => {
   if (!rank) return '#888';
@@ -29,15 +26,20 @@ const getRequestId = (playerName, requests = []) => {
 const PLAYERS_PER_PAGE = 8;
 
 const TeamSearchView = () => {
-  const loggedInUser = JSON.parse(localStorage.getItem('user'));
-  const userRole = localStorage.getItem('userRole'); // 'coach' or 'player'
   const [query, setQuery] = useState('');
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [selectedStats, setSelectedStats] = useState(null); // ← add this
+  const [modalLoading, setModalLoading] = useState(false);  // ← add this
   const [requests, setRequests] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // moved these statements inside teamsearchview component
+  const loggedInUser = JSON.parse(localStorage.getItem('user'));
+  const userRole = localStorage.getItem('userRole'); // 'coach' or 'player'
+
+  // BUG 1 FIX: only fetch requests if logged in as coach
   useEffect(() => {
   const fetchRequests = async () => {
     try {
@@ -72,50 +74,80 @@ useEffect(() => {
   };
   fetchPlayers();
 }, []);
-  const handleRequest = async (player) => {
-    // BUG 4 FIX: only block if Pending or Approved — allow re-request after Rejection
-    const status = getRequestStatus(player.username, requests);
-    if (status === 'Pending' || status === 'Approved') return;
 
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/requests/${loggedInUser._id}/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          playerId: player._id,
-          teamId: loggedInUser.teamId,
-        }),
-      });
+ // modified this function
+ const handleRequest = async (player) => {
+  const status = getRequestStatus(player.username, requests);
+  if (status === 'Pending' || status === 'Approved') return;
 
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'Failed to send request');
-      }
+  try {
+    const token = localStorage.getItem('token');
 
-      const newRequest = await res.json();
+    // ← Fetch fresh coach data to get current teamId
+    const freshRes = await fetch(`/api/users/${loggedInUser._id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const freshUser = await freshRes.json();
+    const teamId = freshUser.teamId?._id ?? freshUser.teamId;
 
-      // If a rejected request existed for this player, replace it
-      setRequests(prev => {
-        const filtered = prev.filter(r => r.player?.username !== player.username);
-        return [
-          ...filtered,
-          {
-            _id: newRequest._id,
-            player: { username: player.username },
-            team: { teamName: loggedInUser.teamName },
-            status: 'Pending',
-          },
-        ];
-      });
-    } catch (err) {
-      console.error('Failed to send request:', err);
+    if (!teamId) {
+      console.error('No team assigned to this coach');
+      return;
     }
-  };
 
+    const res = await fetch(`/api/requests/${loggedInUser._id}/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        playerId: player._id,
+        teamId,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.message || 'Failed to send request');
+    }
+
+    const newRequest = await res.json();
+
+    setRequests(prev => {
+      const filtered = prev.filter(r => r.player?.username !== player.username);
+      return [
+        ...filtered,
+        {
+          _id: newRequest._id,
+          player: { username: player.username },
+          team: { teamName: freshUser.teamId?.teamName ?? '' },
+          status: 'Pending',
+        },
+      ];
+    });
+  } catch (err) {
+    console.error('Failed to send request:', err);
+  }
+};
+
+  // get individual stats of player when user clicks on "view profile"
+  const handleSelectPlayer = async (player) => {
+  setSelected(player);
+  setSelectedStats(null);
+  setModalLoading(true);
+
+  try {
+    const res = await getPlayerStats(player._id); // already imported
+    setSelectedStats(res.data);
+  } catch (err) {
+    console.error('Failed to fetch player stats:', err);
+  } finally {
+    setModalLoading(false);
+  }
+};
+
+  // Filter players based on search query (CHANGED SEARCH QUERY)
   const handleCancel = async (player) => {
     try {
       const requestId = getRequestId(player.username, requests);
@@ -137,7 +169,7 @@ useEffect(() => {
   };
 
   const filtered = players.filter(p =>
-    p.username.toLowerCase().includes(query.toLowerCase())
+    p.username.toLowerCase().startsWith(query.toLowerCase())
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PLAYERS_PER_PAGE));
@@ -193,7 +225,7 @@ useEffect(() => {
               <div
                 key={player._id}
                 style={styles.card}
-                onClick={() => setSelected(player)}
+                onClick={() => handleSelectPlayer(player)}
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,70,85,0.4)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#1a1f2e'}
               >
@@ -214,14 +246,14 @@ useEffect(() => {
                 </div>
                 <div style={styles.teamBadge}>
                   <Shield size={11} color="#ff4655" style={{ marginRight: 5 }} />
-                  {player.teamId ?? 'No Team'}
+                  {player.teamId?.teamName ?? 'No Team'}
                 </div>
                 <div style={styles.cardStats}>
                   {[
                     { label: 'K/D', value: player.kdRatio },
                     { label: 'WIN%', value: player.winRate },
-                    { label: 'ACS', value: player.stats?.acs },
-                    { label: 'HS%', value: player.headshotPercentage },
+                    { label: 'ACS', value: 'N/A' }, // keep as N/A for now
+                    { label: 'HS%',  value: player.headshotPercentage },
                   ].map(s => (
                     <div key={s.label} style={styles.statItem}>
                       <div style={styles.statLabel}>{s.label}</div>
@@ -308,15 +340,16 @@ useEffect(() => {
               </div>
             </div>
 
+            {/* Stats grid */}
             <div style={modal.statsGrid}>
               {[
-                { label: 'K/D', value: selected.kdRatio },
-                { label: 'WIN RATE', value: selected.winRate },
-                { label: 'ACS', value: selected.stats?.acs },
-                { label: 'HS%', value: selected.headshotPercentage },
-                { label: 'KAST', value: 'N/A' },
-                { label: 'DMG/RND', value: 'N/A' },
-                { label: 'KILLS', value: selected.stats?.kills },
+                { label: 'K/D',     value: selected.kdRatio },
+                { label: 'WIN RATE',value: selected.winRate + '%' },
+                { label: 'ACS',     value: modalLoading ? '...' : (selectedStats?.acs ?? 'N/A') },
+                { label: 'HS%',     value: selected.headshotPercentage + '%' },
+                { label: 'KAST',    value: modalLoading ? '...' : (selectedStats?.kast ?? 'N/A') },
+                { label: 'DMG/RND', value: modalLoading ? '...' : (selectedStats?.damagePerRound ?? 'N/A') },
+                { label: 'KILLS',   value: selected.stats?.kills },
                 { label: 'MATCHES', value: (selected.stats?.wins ?? 0) + (selected.stats?.losses ?? 0) },
               ].map(s => (
                 <div key={s.label} style={modal.statBox}>
@@ -332,26 +365,36 @@ useEffect(() => {
                 <tr>{['AGENT', 'MATCHES', 'WIN%', 'K/D', 'ACS'].map(h => <th key={h} style={modal.th}>{h}</th>)}</tr>
               </thead>
               <tbody>
-                {(selected.topAgents ?? []).map(a => (
-                  <tr key={a.name}>
-                    <td style={modal.td}><strong style={{ color: '#fff' }}>{a.name}</strong><div style={{ fontSize: 10, color: '#555' }}>{a.role}</div></td>
-                    <td style={modal.td}>{a.matches}</td>
-                    <td style={{ ...modal.td, color: '#22c55e', fontWeight: 700 }}>{a.winRate}</td>
-                    <td style={{ ...modal.td, fontWeight: 700 }}>{a.kd}</td>
-                    <td style={{ ...modal.td, color: '#ff4655', fontWeight: 700 }}>{a.acs}</td>
-                  </tr>
-                ))}
+                {/* TOP AGENTS */}
+                {(modalLoading ? [] : (selectedStats?.topAgents ?? [])).map(a => (
+                <tr key={a.agent}>
+                  <td style={modal.td}>
+                    <strong style={{ color: '#fff' }}>{a.agent ?? 'Unknown'}</strong>
+                  </td>
+                  <td style={modal.td}>{a.matchesPlayed}</td>
+                  <td style={{ ...modal.td, color: '#22c55e', fontWeight: 700 }}>
+                    {a.matchesPlayed ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%' : '0%'}
+                  </td>
+                  <td style={{ ...modal.td, fontWeight: 700 }}>
+                    {a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2)}
+                  </td>
+                  <td style={{ ...modal.td, color: '#ff4655', fontWeight: 700 }}>N/A</td>
+                </tr>
+              ))}
               </tbody>
             </table>
 
             <div style={modal.sectionTitle}><Shield size={12} color="#ff4655" style={{ marginRight: 6 }} />TOP MAPS</div>
-            {(selected.topMaps ?? []).map(m => (
-              <div key={m.map} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', padding: '8px 0' }}>
-                <span style={{ color: '#fff', fontWeight: 700, flex: 1 }}>{m.map}</span>
-                <span style={{ fontSize: 11, color: '#555', marginRight: 16 }}>{m.wins}W - {m.losses}L</span>
-                <span style={{ color: '#22c55e', fontWeight: 900 }}>{m.winRate}</span>
-              </div>
-            ))}
+            {/* TOP MAPS */}
+            {(modalLoading ? [] : (selectedStats?.topMaps ?? [])).map(m => (
+            <div key={m.map} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', padding: '8px 0' }}>
+              <span style={{ color: '#fff', fontWeight: 700, flex: 1 }}>{m.map ?? 'Unknown'}</span>
+              <span style={{ fontSize: 11, color: '#555', marginRight: 16 }}>{m.wins}W - {m.losses}L</span>
+              <span style={{ color: '#22c55e', fontWeight: 900 }}>
+                {m.matchesPlayed ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%' : '0%'}
+              </span>
+            </div>
+          ))}
           </div>
         </div>
       )}

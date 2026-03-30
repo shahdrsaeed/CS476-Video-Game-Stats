@@ -3,6 +3,7 @@ import {
   Shield, User, TrendingUp, Map, X, ChevronRight,
   Users, Zap, AlertTriangle, Star, UserMinus, Check, Clock
 } from 'lucide-react';
+import { getUser, getCoach, getCoachPlayers, getPlayerStats, getCoachAggregatedStats } from '../services/UserApi';
 import Navbar from '../components/Navbar';
 
 const loggedInUser = JSON.parse(localStorage.getItem('user'));
@@ -31,9 +32,6 @@ const winRateColor = (wr) => {
 
 const ALL_MAPS = ['Haven', 'Pearl', 'Bind', 'Abyss', 'Split', 'Breeze', 'Corrode'];
 
-// ─────────────────────────────────────────────
-// Adapter
-// ─────────────────────────────────────────────
 const adaptPlayer = (raw) => ({
   ...raw,
   id:              raw._id,
@@ -49,43 +47,38 @@ const adaptPlayer = (raw) => ({
   headshotPercent: raw.headshotPercentage ?? '0.00',
   kast:            'N/A',
   damagePerRound:  'N/A',
-  kills:           raw.stats?.kills   ?? 0,
-  deaths:          raw.stats?.deaths  ?? 0,
+  kills:           raw.stats?.kills ?? 0,
+  deaths:          raw.stats?.deaths ?? 0,
   firstBloods:     raw.stats?.firstBloods ?? 0,
   matches:         (raw.stats?.wins ?? 0) + (raw.stats?.losses ?? 0),
   roles:           raw.roles ?? [],
   topAgents: (raw.topAgents ?? []).map(a => ({
-    name:    a.agent?.name   ?? 'Unknown',
-    role:    a.agent?.role   ?? '',
+    name:    a.agent?.name ?? 'Unknown',
+    role:    a.agent?.role ?? '',
     matches: a.matchesPlayed ?? 0,
     winRate: a.matchesPlayed ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%' : '0%',
-    kd:      a.deaths === 0  ? a.kills : (a.kills / a.deaths).toFixed(2),
+    kd:      a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
     acs:     'N/A',
   })),
   topMaps: (raw.topMaps ?? []).map(m => ({
     map:     m.map?.name ?? 'Unknown',
-    wins:    m.wins      ?? 0,
-    losses:  m.losses    ?? 0,
+    wins:    m.wins ?? 0,
+    losses:  m.losses ?? 0,
     played:  m.matchesPlayed ?? 0,
     winRate: m.matchesPlayed ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) : '0',
   })),
   recentMatches: (raw.last20Matches ?? []).map(m => ({
-    map:       m.match?.map       ?? 'N/A',
+    map:       m.match?.map?.name ?? 'N/A',
     result:    m.result === 'Win' ? 'W' : 'L',
-    score:     m.match?.score     ?? 'N/A',
-    kd:        m.match?.kd        ?? 0,
-    kda:       m.match?.kda       ?? 'N/A',
-    acs:       m.match?.acs       ?? 0,
+    score:     m.match?.score ?? 'N/A',
+    kd:        m.match?.kd ?? 0,
+    kda:       m.match?.kda ?? 'N/A',
+    acs:       m.match?.acs ?? 0,
     placement: m.match?.placement ?? 'N/A',
   })),
 });
 
-// ─────────────────────────────────────────────
-// Map Performance Table
-// Rows = players, Columns = maps, + overall avg
-// ─────────────────────────────────────────────
 const MapPerformanceTable = ({ players }) => {
-  // Only show maps where at least one player has data
   const activeMaps = ALL_MAPS.filter(mapName =>
     players.some(p => p.topMaps.find(m => m.map === mapName && m.played > 0))
   );
@@ -96,7 +89,8 @@ const MapPerformanceTable = ({ players }) => {
         No map data available yet — stats will appear after matches are played.
       </div>
     );
-  }
+  }  
+
 
   // Team-average win rate per map
   const teamAvg = (mapName) => {
@@ -232,19 +226,40 @@ const tbl = {
 // ─────────────────────────────────────────────
 const generateAdvice = (player) => {
   const advice = { weaknesses: [], mapAdvice: [], composition: [], verdict: '' };
-  if (parseFloat(player.headshotPercent) < 30)
-    advice.weaknesses.push(`Low headshot % (${pct(player.headshotPercent)}) — needs aim training.`);
-  if (player.kdRatio < 1.2)
-    advice.weaknesses.push(`K/D of ${player.kdRatio} is below carry threshold — review positioning.`);
-  const weak   = player.topMaps.filter(m => parseFloat(m.winRate) < 50);
-  const strong = player.topMaps.filter(m => parseFloat(m.winRate) >= 65);
-  if (weak.length)   advice.mapAdvice.push(`Struggles on: ${weak.map(m => m.map).join(', ')}`);
-  if (strong.length) advice.mapAdvice.push(`Strong on: ${strong.map(m => m.map).join(', ')}`);
-  if (player.topAgents.length > 0)
-    advice.composition.push(`${player.topAgents[0].name} is their signature agent.`);
-  if (player.kdRatio >= 1.4 && parseFloat(player.winRate) >= 65) advice.verdict = 'PROMOTE';
-  else if (player.kdRatio < 1.1 || parseFloat(player.winRate) < 55) advice.verdict = 'BENCH';
-  else advice.verdict = 'KEEP';
+
+  if (parseFloat(player.headshotPercentage ?? player.headshotPercent ?? 100) < 30)
+    advice.weaknesses.push(`Low headshot % — needs aim training, especially flick shots.`);
+  if (parseFloat(player.kdRatio) < 1.2)
+    advice.weaknesses.push(`K/D of ${player.kdRatio} is below carry threshold — review positioning and aggression timing.`);
+  if (player.stats?.firstBloods < 400)
+    advice.weaknesses.push(`Only ${player.stats?.firstBloods} first bloods — passive entry fragging style.`);
+
+  const maps = player.topMaps ?? [];
+  const weakMaps = maps.filter(m => parseFloat(m.winRate) < 60);
+  const strongMaps = maps.filter(m => parseFloat(m.winRate) >= 65);
+  if (weakMaps.length > 0)
+    advice.mapAdvice.push(`Struggles on: ${weakMaps.map(m => m.map?.name ?? m.map).join(', ')} — consider banning in scrims.`);
+  if (strongMaps.length > 0)
+    advice.mapAdvice.push(`Strong on: ${strongMaps.map(m => m.map?.name ?? m.map).join(', ')} — prioritize in competitive play.`);
+  if (maps.length === 0)
+    advice.mapAdvice.push('No map data available yet.');
+
+  const agents = player.topAgents ?? [];
+  if (agents.length > 0) {
+    const agentName = agents[0].agent?.name ?? agents[0].name ?? 'Unknown';
+    advice.composition.push(`${agentName} is their signature agent — build strategies around it.`);
+  } else {
+    advice.composition.push('No agent data available yet.');
+  }
+
+  if (parseFloat(player.kdRatio) >= 1.4 && parseFloat(player.winRate) >= 65) {
+    advice.verdict = 'PROMOTE';
+  } else if (parseFloat(player.kdRatio) < 1.1 || parseFloat(player.winRate) < 55) {
+    advice.verdict = 'BENCH';
+  } else {
+    advice.verdict = 'KEEP';
+  }
+
   return advice;
 };
 
@@ -308,17 +323,17 @@ const AdviceItem = ({ text, color }) => (
 // ─────────────────────────────────────────────
 // Player Detail Panel (with remove button)
 // ─────────────────────────────────────────────
-const PlayerDetailPanel = ({ player, onClose, onAdvice, onRemove }) => (
+const PlayerDetailPanel = ({ player, stats, onClose, onAdvice, onRemove }) => (
   <div style={detail.overlay} onClick={onClose}>
     <div style={detail.panel} onClick={e => e.stopPropagation()}>
       <div style={detail.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <img src={player.avatar} alt={player.name} style={detail.avatar} onError={e => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }} />
           <div>
-            <div style={detail.name}>{player.name}</div>
-            <div style={{ fontSize: 12, color: '#555' }}>{player.valorantId}</div>
-            <div style={{ fontSize: 13, color: rankColor(player.currentRank), fontWeight: 900, marginTop: 4 }}>
-              {player.currentRank} · {player.rankRating} RR
+            <div style={detail.name}>{player.username}</div>
+            <div style={{ fontSize: 12, color: '#555' }}>{player.role}</div>
+            <div style={{ fontSize: 13, color: rankColor(player.rank), fontWeight: 900, marginTop: 4 }}>
+              {player.rank} · {player.rr} RR
             </div>
           </div>
         </div>
@@ -328,12 +343,17 @@ const PlayerDetailPanel = ({ player, onClose, onAdvice, onRemove }) => (
           <button style={detail.closeBtn} onClick={onClose}><X size={16} /></button>
         </div>
       </div>
+{/* Stats Grid */}
       <div style={detail.statsGrid}>
         {[
-          { label: 'K/D', value: player.kdRatio }, { label: 'WIN RATE', value: player.winRate + '%' },
-          { label: 'ACS', value: player.acs },      { label: 'HS%', value: pct(player.headshotPercent) },
-          { label: 'KAST', value: player.kast },    { label: 'DMG/RND', value: player.damagePerRound },
-          { label: 'KILLS', value: player.kills },  { label: 'DEATHS', value: player.deaths },
+          { label: 'K/D',     value: player.kdRatio },
+          { label: 'WIN RATE',value: player.winRate + '%' },
+          { label: 'ACS',     value: stats?.acs ?? 'N/A' },
+          { label: 'HS%',     value: pct(player.headshotPercent) },
+          { label: 'KAST',    value: stats?.kast ?? 'N/A' },
+          { label: 'DMG/RND', value: stats?.damagePerRound ?? 'N/A' },
+          { label: 'KILLS',   value: player.kills },
+          { label: 'DEATHS',  value: player.deaths },
         ].map(s => (
           <div key={s.label} style={detail.statBox}>
             <div style={{ fontSize: 10, color: '#555', letterSpacing: 1 }}>{s.label}</div>
@@ -345,13 +365,13 @@ const PlayerDetailPanel = ({ player, onClose, onAdvice, onRemove }) => (
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
         <thead><tr>{['AGENT','MATCHES','WIN%','K/D','ACS'].map(h => <th key={h} style={detail.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {player.topAgents.map(a => (
-            <tr key={a.name}>
-              <td style={detail.td}><strong style={{ color: '#fff' }}>{a.name}</strong><div style={{ fontSize: 10, color: '#555' }}>{a.role}</div></td>
-              <td style={detail.td}>{a.matches}</td>
+          {(player.topAgents ?? []).map((a, i) => (
+            <tr key={i}>
+              <td style={detail.td}><strong style={{ color: '#fff' }}>{a.name ?? 'Unknown'}</strong></td>
+              <td style={detail.td}>{a.matches ?? 0}</td>
               <td style={{ ...detail.td, color: '#22c55e', fontWeight: 700 }}>{a.winRate}</td>
               <td style={{ ...detail.td, fontWeight: 700 }}>{a.kd}</td>
-              <td style={{ ...detail.td, color: '#ff4655', fontWeight: 700 }}>{a.acs}</td>
+              <td style={{ ...detail.td, color: '#ff4655', fontWeight: 700 }}>N/A</td>
             </tr>
           ))}
         </tbody>
@@ -360,12 +380,12 @@ const PlayerDetailPanel = ({ player, onClose, onAdvice, onRemove }) => (
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>{['MAP','RESULT','SCORE','K/D','K/D/A','ACS','PLACE'].map(h => <th key={h} style={detail.th}>{h}</th>)}</tr></thead>
         <tbody>
-          {player.recentMatches.map((m, i) => (
+          {(player.recentMatches ?? []).map((m, i) => (
             <tr key={i}>
               <td style={{ ...detail.td, color: '#fff', fontWeight: 700 }}>{m.map}</td>
               <td style={{ ...detail.td, color: resultColor(m.result), fontWeight: 900 }}>{m.result}</td>
               <td style={detail.td}>{m.score}</td>
-              <td style={{ ...detail.td, fontWeight: 700, color: m.kd >= 1.5 ? '#22c55e' : m.kd < 1 ? '#ff4655' : '#fff' }}>{m.kd}</td>
+              <td style={{ ...detail.td, fontWeight: 700, color: '#fff' }}>{m.kd}</td>
               <td style={detail.td}>{m.kda}</td>
               <td style={{ ...detail.td, color: '#ff4655', fontWeight: 700 }}>{m.acs}</td>
               <td style={{ ...detail.td, color: m.placement === 'MVP' ? '#ffffa0' : '#888', fontWeight: 700 }}>{m.placement}</td>
@@ -405,36 +425,28 @@ const ConfirmRemoveModal = ({ player, onConfirm, onCancel }) => (
 // Main Coach Dashboard
 // ─────────────────────────────────────────────
 const CoachDashboardView = () => {
-  const [players,        setPlayers]        = useState([]);
-  const [loading,        setLoading]        = useState(true);
+  const [coach, setCoach] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [advicePlayer,   setAdvicePlayer]   = useState(null);
-  const [removeTarget,   setRemoveTarget]   = useState(null);
-  const [removeError,    setRemoveError]    = useState(null);
+  const [advicePlayer, setAdvicePlayer] = useState(null);
+  const [selectedStats, setSelectedStats] = useState(null);
+  const [aggregatedStats, setAggregatedStats] = useState(null);
+  const [playerStatsMap, setPlayerStatsMap] = useState({});
+  const [removeTarget, setRemoveTarget] = useState(null);
+  const [removeError, setRemoveError] = useState(null);
 
-  // ── Fetch roster ──────────────────────────────────────────
-  const fetchRoster = async () => {
-    try {
-      const teamId = loggedInUser?.teamId;
-      if (!teamId) { setLoading(false); return; }
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/teams/${teamId}/players`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to fetch roster');
-      const data = await res.json();
-      setPlayers(data.map(adaptPlayer));
-    } catch (err) {
-      console.error('Failed to fetch roster:', err);
-    } finally {
-      setLoading(false);
-    }
+  const handleSelectPlayer = (player) => {
+    setSelectedPlayer(player);
+    setSelectedStats(playerStatsMap[player._id] ?? null);
   };
 
-  useEffect(() => { fetchRoster(); }, []);
+  const handleRemoveClick = (player) => {
+    setSelectedPlayer(null);
+    setRemoveTarget(player);
+    setRemoveError(null);
+  };
 
-  // ── Remove player ──────────────────────────────────────────
-  const handleRemoveClick   = (player) => { setSelectedPlayer(null); setRemoveTarget(player); setRemoveError(null); };
   const handleRemoveConfirm = async (player) => {
     try {
       const token = localStorage.getItem('token');
@@ -450,13 +462,54 @@ const CoachDashboardView = () => {
     }
   };
 
-  // ── Team averages ──────────────────────────────────────────
-  const avg = (key) => players.length === 0 ? 'N/A'
-    : (players.reduce((s, p) => s + (parseFloat(p[key]) || 0), 0) / players.length).toFixed(2);
-  const avgWin = players.length === 0 ? 'N/A'
-    : (players.reduce((s, p) => s + parseFloat(p.winRate ?? 0), 0) / players.length).toFixed(1) + '%';
-  const totalMatches = players.reduce((s, p) => s + (p.matches || 0), 0);
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const stored = localStorage.getItem('user');
+        if (!stored) return;
+        const { _id } = JSON.parse(stored);
 
+        const coachRes = await getCoach(_id);
+        setCoach(coachRes.data);
+
+        const aggRes = await getCoachAggregatedStats(_id);
+        setAggregatedStats(aggRes.data);
+
+        const playersRes = await getCoachPlayers(_id);
+        setPlayers(playersRes.data.map(adaptPlayer));
+
+        const statsResults = await Promise.allSettled(
+          playersRes.data.map(p => getPlayerStats(p._id))
+        );
+
+        const statsMap = {};
+        statsResults.forEach((result, i) => {
+          if (result.status === 'fulfilled') {
+            const pid = playersRes.data[i]._id;
+            statsMap[pid] = result.value.data;
+          }
+        });
+        setPlayerStatsMap(statsMap);
+
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  const avgKD = players.length
+    ? (players.reduce((s, p) => s + parseFloat(p.kdRatio ?? 0), 0) / players.length).toFixed(2)
+    : '0.00';
+  const avgWinRate = players.length
+    ? (players.reduce((s, p) => s + parseFloat(p.winRate ?? 0), 0) / players.length).toFixed(1) + '%'
+    : '0%';
+  const totalMatches = players.reduce((s, p) => s + (p.matchesPlayed ?? 0), 0);
+
+  if (loading) return <div style={{ color: '#fff', padding: 40 }}>Loading...</div>;
+  if (!coach) return <div style={{ color: '#fff', padding: 40 }}>No coach data found.</div>;
   return (
     <div style={styles.page}>
       <Navbar />
@@ -465,23 +518,23 @@ const CoachDashboardView = () => {
         {/* ── COACH BANNER ── */}
         <div style={styles.banner}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <img src={loggedInUser?.imageURL || '/default-avatar.png'} alt={loggedInUser?.username} style={styles.bannerAvatar}
+            <img src={coach?.imageURL || '/default-avatar.png'} alt={coach?.username} style={styles.bannerAvatar}
               onError={e => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }} />
             <div>
-              <div style={styles.bannerName}>{loggedInUser?.username ?? 'Coach'}</div>
-              <div style={{ fontSize: 12, color: '#555', letterSpacing: 1, marginBottom: 8 }}>{loggedInUser?.title ?? 'Head Coach'}</div>
+              <div style={styles.bannerName}>{coach?.username}</div>
+              <div style={{ fontSize: 12, color: '#555', letterSpacing: 1, marginBottom: 8 }}>{coach?.role}</div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <span style={styles.badge}><Shield size={11} style={{ marginRight: 4 }} />{loggedInUser?.teamId ? 'Team Assigned' : 'No Team Yet'}</span>
+                <span style={styles.badge}><Shield size={11} style={{ marginRight: 4 }} />{coach?.teamId?.teamName ?? 'No Team'}</span>
                 <span style={styles.badge}><Users size={11} style={{ marginRight: 4 }} />{players.length} PLAYERS</span>
               </div>
             </div>
           </div>
           <div style={styles.teamStats}>
             {[
-              { label: 'AVG K/D',       value: avg('kdRatio') },
-              { label: 'AVG WIN RATE',  value: avgWin },
-              { label: 'AVG ACS',       value: avg('acs') },
-              { label: 'TOTAL MATCHES', value: totalMatches },
+              { label: 'AVG K/D',      value: aggregatedStats?.averageKd ?? avgKD },
+              { label: 'AVG WIN RATE', value: aggregatedStats ? aggregatedStats.averageWinRate + '%' : avgWinRate },
+              { label: 'AVG ACS',      value: aggregatedStats?.averageAcs ?? 'N/A' },
+              { label: 'TOTAL MATCHES',value: aggregatedStats?.totalMatchesPlayed ?? totalMatches },
             ].map(s => (
               <div key={s.label} style={styles.teamStatBox}>
                 <div style={{ fontSize: 10, color: '#555', letterSpacing: 1 }}>{s.label}</div>
@@ -512,10 +565,10 @@ const CoachDashboardView = () => {
               </thead>
               <tbody>
                 {players.map(player => (
-                  <tr key={player.id} style={styles.tr}
+                  <tr key={player._id} style={styles.tr}
                     onMouseEnter={e => (e.currentTarget.style.background = '#141820')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    onClick={() => setSelectedPlayer(player)}
+                    onClick={() => handleSelectPlayer(player)}
                   >
                     <td style={styles.td}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -534,14 +587,20 @@ const CoachDashboardView = () => {
                       {player.kdRatio}
                     </td>
                     <td style={styles.td}><span style={styles.winRateBadge}>{player.winRate}%</span></td>
-                    <td style={{ ...styles.td, fontWeight: 700, color: '#ff4655' }}>{player.acs}</td>
+                    <td style={{ ...styles.td, fontWeight: 700, color: '#ff4655' }}>
+                      {playerStatsMap[player._id]?.acs ?? 'N/A'}
+                    </td>
                     <td style={styles.td}>{pct(player.headshotPercent)}</td>
-                    <td style={styles.td}>{player.kast}</td>
-                    <td style={styles.td}>{player.damagePerRound}</td>
-                    <td style={styles.td}>{player.matches}</td>
+                    <td style={styles.td}>
+                      {playerStatsMap[player._id]?.kast ?? 'N/A'}
+                    </td>
+                    <td style={styles.td}>
+                      {playerStatsMap[player._id]?.damagePerRound ?? 'N/A'}
+                    </td>
+                    <td style={styles.td}>{player.matchesPlayed}</td>
                     <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button style={styles.detailBtn} onClick={e => { e.stopPropagation(); setSelectedPlayer(player); }}>
+                        <button style={styles.detailBtn} onClick={e => { e.stopPropagation(); handleSelectPlayer(player); }}>
                           VIEW <ChevronRight size={12} />
                         </button>
                         <button style={styles.removeBtn} onClick={e => { e.stopPropagation(); handleRemoveClick(player); }} title="Remove from roster">
@@ -574,6 +633,7 @@ const CoachDashboardView = () => {
       {selectedPlayer && (
         <PlayerDetailPanel
           player={selectedPlayer}
+          stats={selectedStats}        // ← add this
           onClose={() => setSelectedPlayer(null)}
           onAdvice={p => { setAdvicePlayer(p); setSelectedPlayer(null); }}
           onRemove={handleRemoveClick}

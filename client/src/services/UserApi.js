@@ -19,6 +19,9 @@ export const getUser = (id) => {
   return axios.get(`/api/users/${id}`);
 };
 
+// used in PlayerProfileView
+export const getPlayerStats = (id) => axios.get(`/api/players/${id}/stats`);
+
 // used in TeamSearchView
 export const getAllPlayers = (search = '') => {
   return axios.get(`/api/players${search ? `?search=${search}` : ''}`);
@@ -26,10 +29,18 @@ export const getAllPlayers = (search = '') => {
 
 // used in GeneralView
 export const getCoach = (id) => {
-  return axios.get(`/api/users/${id}`);
+  return axios.get(`/api/coach/${id}`);
 };
 
 // used in GeneralView
 export const getTeam = (id) => {
   return axios.get(`/api/teams/${id}`);
 };
+
+// used in CoachDashboardView
+export const getCoachAggregatedStats = (coachId) => 
+  axios.get(`/api/coach/${coachId}/aggregated-stats`);
+
+// used in CoachDashboardView
+export const getCoachPlayers = (coachId) =>
+  axios.get(`/api/coach/${coachId}/players`);

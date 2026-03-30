@@ -22,6 +22,7 @@ exports.create = async (req, res) => {
 
     const user = await UserFactory.create(role, { username, email, password, ...rest}, imageURL);
 
+    // Only reached for Player
     await user.save();
 
     res.status(201).json({
@@ -79,7 +80,9 @@ exports.login = async (req, res) => {
 
 exports.getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.params.id)
+    .populate('teamId', 'teamName') // ← add this
+    .populate('coach', 'username imageURL title');  // ← add this
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });

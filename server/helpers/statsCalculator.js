@@ -85,6 +85,8 @@ const calculateDDDeltaPerRound = (player) => {
  * @param {Object} player - Player document with populated last20Matches.match
  * @returns {String} average ACS as string with 2 decimals
  */
+
+/*
 const calculateACS = (player) => {
   let totalDamage = 0;
   let totalRounds = 0;
@@ -100,6 +102,81 @@ const calculateACS = (player) => {
       totalRounds++;
       totalDamage += p.damageDealt;
     });
+  });
+
+  if (totalRounds === 0) return '0.00';
+  return (totalDamage / totalRounds).toFixed(2);
+};
+*/
+// modified function so that it uses the aggregated match.players[].stats.damageDealt rather than looping through rounds.
+const calculateACS = (player) => {
+  let totalDamage = 0;
+  let totalRounds = 0;
+
+  player.last20Matches.forEach(entry => {
+    const match = entry.match;
+    if (!match || !match.players) return;
+
+    const matchPlayer = match.players.find(
+      mp => mp.player.toString() === player._id.toString()
+    );
+    if (!matchPlayer || !matchPlayer.stats) return;
+
+    const roundsInMatch = match.rounds.length;
+    if (roundsInMatch === 0) return;
+
+    totalDamage += matchPlayer.stats.damageDealt; // ← was just `damageDealt`
+    totalRounds += roundsInMatch;
+  });
+
+  if (totalRounds === 0) return '0.00';
+  return (totalDamage / totalRounds).toFixed(2);
+};
+
+// calculate kills per round
+const calculateKillsPerRound = (player) => {
+  let totalKills = 0;
+  let totalRounds = 0;
+
+  player.last20Matches.forEach(entry => {
+    const match = entry.match;
+    if (!match || !match.players) return;
+
+    const matchPlayer = match.players.find(
+      mp => mp.player.toString() === player._id.toString()
+    );
+    if (!matchPlayer || !matchPlayer.stats) return;
+
+    const roundsInMatch = match.rounds.length;
+    if (roundsInMatch === 0) return;
+
+    totalKills += matchPlayer.stats.kills;
+    totalRounds += roundsInMatch;
+  });
+
+  if (totalRounds === 0) return '0.00';
+  return (totalKills / totalRounds).toFixed(2);
+};
+
+// calculates damage per round
+const calculateDamagePerRound = (player) => {
+  let totalDamage = 0;
+  let totalRounds = 0;
+
+  player.last20Matches.forEach(entry => {
+    const match = entry.match;
+    if (!match || !match.players) return;
+
+    const matchPlayer = match.players.find(
+      mp => mp.player.toString() === player._id.toString()
+    );
+    if (!matchPlayer || !matchPlayer.stats) return;
+
+    const roundsInMatch = match.rounds.length;
+    if (roundsInMatch === 0) return;
+
+    totalDamage += matchPlayer.stats.damageDealt;
+    totalRounds += roundsInMatch;
   });
 
   if (totalRounds === 0) return '0.00';
@@ -217,6 +294,8 @@ module.exports = {
   calculateKAST,
   calculateDDDeltaPerRound,
   calculateACS,
+  calculateKillsPerRound,   // ← add
+  calculateDamagePerRound,  // ← add
   calculateTopAgents,
   calculateTopMaps,
   calculateTopWeapons
