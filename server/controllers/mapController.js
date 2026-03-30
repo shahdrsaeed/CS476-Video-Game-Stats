@@ -19,9 +19,9 @@ const getAllMaps = async (req, res) => {
  * @route
  * @returns {Object}
  */
-const getMapByName = async (req, res) => {
+const getMapById = async (req, res) => {
     try {
-        const map = await Map.findOne ({ name: req.params.name }).select('__v');
+        const map = await Map.findById(req.params.id);
 
         if (!map) return res.status(404).json({ success: false, error: 'Map not found' });
 
@@ -31,4 +31,4 @@ const getMapByName = async (req, res) => {
     }
 };
 
-module.exports = { getAllMaps, getMapByName };
+module.exports = { getAllMaps, getMapById };

@@ -178,6 +178,12 @@ PlayerSchema.methods.addMatch = function (matchData) {
   }
 };
 
+// Method to update stats and save player
+PlayerSchema.methods.updateStats = function (newStats) {
+  Object.assign(this.stats, newStats);
+  return this.save();
+};
+
 
 // Indexes for efficient querying
 PlayerSchema.index({ 'stats.kills': -1 });

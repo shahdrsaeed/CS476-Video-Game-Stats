@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'; // added RefreshCw
-// import { PLAYERS_LIST } from '../data/mockData';
+import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'; 
 import { getUser } from '../services/UserApi';
 import Navbar from '../components/Navbar'
+import axios from 'axios';
 
 // ── Rank color helper ──
 const rankColor = (rank) => {
@@ -18,53 +18,13 @@ const rankColor = (rank) => {
 const resultColor = (r) => r === 'W' ? '#22c55e' : '#ff4655';
 
 const PlayerProfileView = () => {
-  // For now show the first player (later this will come from login/routing)
-  // const player = PLAYERS_LIST[0];
   const [player, setPlayer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedMatch, setExpandedMatch] = useState(null);
-
+  const [error, setError] = useState(null);
+  const [playerId, setPlayerId] = useState(null); // Store player ID for API calls
   const [justUpdated, setJustUpdated] = useState(false);
-const [spinning, setSpinning] = useState(false);
-
-const maps = ['Haven', 'Pearl', 'Bind', 'Abyss', 'Split', 'Breeze', 'Corrode'];
-const placements = ['MVP', '2nd', '3rd', '4th', '5th'];
-const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-// added this
-const generateFakeMatch = () => {
-    const kills = rand(10, 35);
-    const deaths = rand(8, 25);
-    const assists = rand(2, 12);
-    const result = Math.random() > 0.4 ? 'W' : 'L';
-    const score = result === 'W' ? `13:${rand(0, 10)}` : `${rand(5, 12)}:13`;
-    return {
-      date: 'Today',
-      map: maps[rand(0, maps.length - 1)],
-      result,
-      score,
-      kd: parseFloat((kills / deaths).toFixed(1)),
-      kda: `${kills}/${deaths}/${assists}`,
-      ddDelta: rand(-50, 150),
-      hs: rand(20, 55),
-      acs: rand(180, 450),
-      placement: placements[rand(0, placements.length - 1)],
-    };
-  };
-
-  const handleSimulateMatch = () => {
-    setSpinning(true);
-    setTimeout(() => {
-      const newMatch = generateFakeMatch();
-      setPlayer(prev => ({
-        ...prev,
-        recentMatches: [newMatch, ...(prev.recentMatches ?? []).slice(0, 19)],
-      }));
-      setSpinning(false);
-      setJustUpdated(true);
-      setTimeout(() => setJustUpdated(false), 2500);
-    }, 800);
-  };
+  const [spinning, setSpinning] = useState(false);
 
   useEffect(() => {
     const fetchPlayer = async () => {
@@ -72,93 +32,132 @@ const generateFakeMatch = () => {
         const stored = localStorage.getItem('user');
         if (!stored) return;
 
-        const { _id } = JSON.parse(stored);
-        const res = await getUser(_id);
+        const { _id } = JSON.parse(stored); // Extract the player ID from localStorage
+        setPlayerId(_id); // Store it in the state for later use
+
+        const res = await getUser(_id); // Fetch player data using the player ID
         const raw = res.data;
 
         // Adapt DB shape → what the JSX expects
         const adapted = {
           ...raw,
-
-          // Fields not yet in DB — show fallback values
-          valorantId: raw.username, // not in player schema
-          team:       raw.teamId ?? 'No Team',
-          playtime:   'N/A',
-          peakRank:   raw.rank,
-          peakRR:     raw.rr,
-
-          // Computed stats not yet in DB
+          valorantId: raw.username,
+          team: raw.teamId ?? 'No Team',
+          playtime: 'N/A',
+          peakRank: raw.rank,
+          peakRR: raw.rr,
           damagePerRound: 'N/A',
-          kast:           'N/A',
-          killsPerRound:  raw.stats?.kills && raw.matchesPlayed
-                            ? (raw.stats.kills / raw.matchesPlayed).toFixed(2)
-                            : 'N/A',
+          kast: 'N/A',
+          killsPerRound: raw.stats?.kills && raw.matchesPlayed ? (raw.stats.kills / raw.matchesPlayed).toFixed(2) : 'N/A',
           ddDeltaPerRound: 'N/A',
-          roundWinRate:    'N/A',
-
-          // roles doesn't exist yet — empty array so .map() won't crash
+          roundWinRate: 'N/A',
           roles: [],
-
-          // topAgents: reshape populated agent objects
           topAgents: (raw.topAgents ?? []).map(a => ({
-            name:     a.agent?.name    ?? 'Unknown',
-            hours:    'N/A',
-            matches:  a.matchesPlayed  ?? 0,
-            winRate:  a.matchesPlayed
-                        ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%'
-                        : '0%',
-            kd:       a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
-            acs:      'N/A',
+            name: a.agent?.name ?? 'Unknown',
+            hours: 'N/A',
+            matches: a.matchesPlayed ?? 0,
+            winRate: a.matchesPlayed ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%' : '0%',
+            kd: a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2),
+            acs: 'N/A',
           })),
-
-          // topWeapons: reshape populated weapon objects
           topWeapons: (raw.topWeapons ?? []).map(w => {
             const total = (w.headshotKills ?? 0) + (w.bodyshotKills ?? 0) + (w.legshotKills ?? 0);
             return {
-              weapon:      w.weapon?.name ?? 'Unknown',
-              type:        w.weapon?.type ?? '',
-              kills:       w.totalKills   ?? 0,
+              weapon: w.weapon?.name ?? 'Unknown',
+              type: w.weapon?.type ?? '',
+              kills: w.totalKills ?? 0,
               headshotPct: total ? ((w.headshotKills / total) * 100).toFixed(1) + '%' : '0%',
-              bodyPct:     total ? ((w.bodyshotKills  / total) * 100).toFixed(1) + '%' : '0%',
-              legsPct:     total ? ((w.legshotKills   / total) * 100).toFixed(1) + '%' : '0%',
+              bodyPct: total ? ((w.bodyshotKills / total) * 100).toFixed(1) + '%' : '0%',
+              legsPct: total ? ((w.legshotKills / total) * 100).toFixed(1) + '%' : '0%',
             };
           }),
-
-          // topMaps: reshape populated map objects
           topMaps: (raw.topMaps ?? []).map(m => ({
-            map:     m.map?.name ?? 'Unknown',
-            wins:    m.wins      ?? 0,
-            losses:  m.losses    ?? 0,
-            winRate: m.matchesPlayed
-                      ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%'
-                      : '0%',
+            map: m.map?.name ?? 'Unknown',
+            wins: m.wins ?? 0,
+            losses: m.losses ?? 0,
+            winRate: m.matchesPlayed ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%' : '0%',
           })),
-
-          // last20Matches → recentMatches (reshape for the table)
           recentMatches: (raw.last20Matches ?? []).map(m => ({
-            date:      m.match?.date   ?? 'N/A',
-            map:       m.match?.map    ?? 'N/A',
-            result:    m.result === 'Win' ? 'W' : 'L',
-            score:     m.match?.score  ?? 'N/A',
-            kd:        m.match?.kd     ?? 0,
-            kda:       m.match?.kda    ?? 'N/A',
-            ddDelta:   m.match?.ddDelta ?? 0,
-            hs:        m.match?.hs     ?? 0,
-            acs:       m.match?.acs    ?? 0,
+            date: m.match?.date ?? 'N/A',
+            map: m.match?.map ?? 'N/A',
+            result: m.result === 'Win' ? 'W' : 'L',
+            score: m.match?.score ?? 'N/A',
+            kd: m.match?.kd ?? 0,
+            kda: m.match?.kda ?? 'N/A',
+            ddDelta: m.match?.ddDelta ?? 0,
+            hs: m.match?.hs ?? 0,
+            acs: m.match?.acs ?? 0,
             placement: m.match?.placement ?? 'N/A',
           })),
         };
 
-        setPlayer(adapted);
+        setPlayer(adapted); // Set the player data
       } catch (err) {
         console.error('Failed to fetch player:', err);
+        setError('Failed to fetch player data');
       } finally {
-        setLoading(false);
+        setLoading(false); // Hide loading spinner
       }
     };
 
     fetchPlayer();
-  }, []);
+  }, []); // Run once on component mount
+
+  const adaptSimulatedMatch = (match, playerId, mapName) => {
+    const playerData = match.players.find(p => p.player === playerId); // get stats for the current player
+
+    return {
+      date: new Date(match.datePlayed).toLocaleDateString(), // format date
+      map: mapName, // now use the mapName directly
+      result: match.result.winningTeam === playerData.team ? 'W' : 'L', // W for win, L for loss
+      score: `${match.score.teamA}-${match.score.teamB}`, // team A vs team B score
+      kd: (playerData.stats.kills / (playerData.stats.deaths || 1)).toFixed(2), // kills/deaths ratio
+      kda: ((playerData.stats.kills + playerData.stats.assists) / (playerData.stats.deaths || 1)).toFixed(2), // (kills + assists) / deaths
+      ddDelta: playerData.stats.damageDealt - playerData.stats.damageTaken, // damage delta
+      hs: ((playerData.stats.headshots / (playerData.stats.totalHits || 1)) * 100).toFixed(1), // headshot percentage
+      acs: playerData.stats.damageDealt, // average combat score (ACS)
+      placement: 'N/A', // or 'MVP' if you have logic for determining MVP
+    };
+  };
+
+  const handleSimulateMatch = async () => {
+    if (!playerId) {
+      setError('Player ID is missing');
+      return;
+    }
+
+    setLoading(true);
+    setSpinning(true);
+
+    try {
+      const response = await axios.put(
+        `http://localhost:8080/api/matches/${playerId}/simulate-match`
+      );
+
+      const simulatedMatch = response.data.match;
+      const newStats = response.data.newStats;
+
+      // Fetch the map name from the backend using the map ID
+      const mapResponse = await axios.get(`http://localhost:8080/api/maps/${simulatedMatch.map}`);
+      const mapName = mapResponse.data.data.name; // Assuming the map data contains a 'name' field
+
+      // Now adapt the simulated match with the fetched map name
+      const adaptedMatch = adaptSimulatedMatch(simulatedMatch, playerId, mapName);
+
+      // Update player stats and recent matches
+      setPlayer(prev => ({
+        ...prev,
+        stats: newStats,
+        recentMatches: [adaptedMatch, ...(prev.recentMatches || [])]
+      }));
+    } catch (err) {
+      console.error(err);
+      setError('Failed to simulate match');
+    } finally {
+      setLoading(false);
+      setSpinning(false);
+    }
+  };
 
   if (loading) return <div style={{ color: '#fff', padding: 40 }}>Loading...</div>;
   if (!player) return <div style={{ color: '#fff', padding: 40 }}>No player data found.</div>;
