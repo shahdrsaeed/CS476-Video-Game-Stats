@@ -102,7 +102,6 @@ const simulateMatch = async (req, res) => {
     }
 
     const subject = new PlayerSubject(player);
-
     const statsLogger = new PlayerStatsLogger();
     const socketObserver = new PlayerSocketObserver(global.io);
 
@@ -111,23 +110,22 @@ const simulateMatch = async (req, res) => {
 
     const s = stat => (player.stats[stat] || 0);
 
-    const matchStats = {
-      kills:          s('kills')          + Math.floor(Math.random() * 20),
-      deaths:         s('deaths')         + Math.floor(Math.random() * 15),
-      assists:        s('assists')        + Math.floor(Math.random() * 20),
-      damageDealt:    s('damageDealt')    + Math.floor(Math.random() * 500),
-      damageTaken:    s('damageTaken')    + Math.floor(Math.random() * 300),
-      headshots:      s('headshots')      + Math.floor(Math.random() * 5),
-      bodyshots:      s('bodyshots')      + Math.floor(Math.random() * 10),
-      legshots:       s('legshots')       + Math.floor(Math.random() * 3),
-      firstBloods:    s('firstBloods')    + (Math.random() > 0.5 ? 1 : 0),
-      firstDeaths:    s('firstDeaths')    + (Math.random() > 0.5 ? 1 : 0),
-      aces:           s('aces')           + (Math.random() > 0.8 ? 1 : 0),
-      flawlessRounds: s('flawlessRounds') + (Math.random() > 0.7 ? 1 : 0),
+    const matchStats = { // generate data for only the current match
+      kills:          Math.floor(Math.random() * 20),
+      deaths:         Math.floor(Math.random() * 15),
+      assists:        Math.floor(Math.random() * 20),
+      damageDealt:    Math.floor(Math.random() * 500),
+      damageTaken:    Math.floor(Math.random() * 300),
+      headshots:      Math.floor(Math.random() * 5),
+      bodyshots:      Math.floor(Math.random() * 10),
+      legshots:       Math.floor(Math.random() * 3),
+      firstBloods:    (Math.random() > 0.5 ? 1 : 0),
+      firstDeaths:    (Math.random() > 0.5 ? 1 : 0),
+      aces:           (Math.random() > 0.8 ? 1 : 0),
+      flawlessRounds: (Math.random() > 0.7 ? 1 : 0),
     };
 
-    const teams = ['A', 'B'];
-    const team = teams[Math.floor(Math.random() * teams.length)];
+    const team = Math.random() > 0.5 ? 'A' : 'B';
     const didWin = Math.random() > 0.5;
     const winningTeam = didWin ? team : (team === 'A' ? 'B' : 'A');
 
@@ -174,7 +172,7 @@ const simulateMatch = async (req, res) => {
     await newMatch.save({ session });
 
     Object.keys(matchStats).forEach(stat => {
-      player.stats[stat] = s(stat) + matchStats[stat] - s(stat);
+      player.stats[stat] = (player.stats[stat] || 0) + matchStats[stat];
     });
 
     if (didWin) player.stats.wins = (player.stats.wins || 0) + 1;
