@@ -1,14 +1,12 @@
 const User = require('../models/User');
-const Player = require('../models/Player');
-const Coach = require('../models/Coach');
-const bcrypt = require('bcrypt'); 
+const UserFactory = require('../factories/UserFactory');
 const jwt = require('jsonwebtoken');
 
 // Create (Player or Coach)
 exports.create = async (req, res) => {
   try {
     const { username, email, password, role, ...rest } = req.body;
-   const imageURL = req.file ? req.file.secure_url : ''; // added this line
+   const imageURL = req.file ? req.file.secure_url : '';
 
     // basic validation
     if (!username || !email || !password || !role) {
@@ -21,32 +19,7 @@ exports.create = async (req, res) => {
       return res.status(400).json({ error: 'Email already in use' });
     }
 
-    // hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    let user;
-
-    if (role === 'Player') {
-      user = new Player({
-        username,
-        email,
-        password: hashedPassword,
-        imageURL, // add this
-        ...rest // rank, level, etc.
-      });
-    } 
-    else if (role === 'Coach') {
-      user = new Coach({
-        username,
-        email,
-        password: hashedPassword,
-        imageURL, // add this
-        ...rest
-      });
-    } 
-    else {
-      return res.status(400).json({ error: 'Invalid role' });
-    }
+    const user = await UserFactory.create(role, { username, email, password, ...rest}, imageURL);
 
     await user.save();
 
@@ -55,8 +28,9 @@ exports.create = async (req, res) => {
       user
     });
 
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (err) { // catches both factory errors and DB errors
+    const status = err.message.startsWith('Invalid role') ? 400 : 500;
+    res.status(status).json({ error: err.message });
   }
 };
 
