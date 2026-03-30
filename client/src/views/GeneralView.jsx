@@ -5,7 +5,6 @@ import { Activity, ShieldCheck, User, TrendingUp, Map, Crosshair, Target, Award 
 // ─────────────────────────────────────────────
 // Helpers (same as CoachPanel)
 // ─────────────────────────────────────────────
-const loggedInUser = JSON.parse(localStorage.getItem('user'));
 
 const rankColor = (rank) => {
   if (!rank) return '#888';
@@ -174,6 +173,7 @@ const GeneralView = () => {
   const [coach,   setCoach]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [teamId, setTeamId] = useState(null); // ← add this state
+  const loggedInUser = JSON.parse(localStorage.getItem('user')); // moved this from helper functions to here so that it is updated between logins
 
 // modified this
   useEffect(() => {
@@ -181,33 +181,43 @@ const GeneralView = () => {
       try {
         const token = localStorage.getItem('token');
 
-        // 1. Fetch fresh user profile
         if (loggedInUser?._id) {
           const cr = await fetch(`/api/users/${loggedInUser._id}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (cr.ok) {
             const freshUser = await cr.json();
-            setCoach(freshUser);
+            setCoach(freshUser); // this is the logged in user (player or coach)
+            setTeamId(freshUser.teamId ?? null); // ← always set, even if null
 
-            const freshTeamId = freshUser.teamId;
-            setTeamId(freshTeamId); // ← use fresh teamId
+            // ← Fetch actual coach if logged in user is a player
+            let coachData = freshUser;
+            if (freshUser.role === 'Player' && freshUser.coach) {
+              const coachId = freshUser.coach?._id ?? freshUser.coach;
+              const coachRes = await fetch(`/api/coach/${coachId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (coachRes.ok) coachData = await coachRes.json();
+            }
+            setCoach(coachData); // now always the actual coach
 
-            if (!freshTeamId) { setLoading(false); return; }
+            const freshTeamId = freshUser.teamId?._id ?? freshUser.teamId;
+            setTeamId(freshTeamId);
 
-            // 2. Fetch roster using fresh teamId
-            const pr = await fetch(`/api/teams/${freshTeamId}/players`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!pr.ok) throw new Error('Failed to fetch players');
-            const data = await pr.json();
-            setPlayers(data.map(adaptPlayer));
+            if (freshTeamId) {
+              const pr = await fetch(`/api/teams/${freshTeamId}/players`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (!pr.ok) throw new Error('Failed to fetch players');
+              const data = await pr.json();
+              setPlayers(data.map(adaptPlayer));
+            }
           }
         }
       } catch (err) {
         console.error('GeneralView load error:', err);
       } finally {
-        setLoading(false);
+        setLoading(false); // ← always called last, after all state is set
       }
     };
     load();
@@ -254,15 +264,15 @@ const GeneralView = () => {
         <div style={gv.banner}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             <img
-              src={loggedInUser?.imageURL || '/default-avatar.png'}
-              alt={loggedInUser?.username}
+              src={coach?.imageURL || '/default-avatar.png'}
+              alt={coach?.username}
               style={gv.bannerAvatar}
               onError={e => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }}
             />
             <div>
-              <div style={gv.bannerName}>{loggedInUser?.username ?? 'Coach'}</div>
+              <div style={gv.bannerName}>{coach?.username ?? 'Coach'}</div>
               <div style={{ fontSize: 12, color: '#555', letterSpacing: 1, marginBottom: 8 }}>
-                {loggedInUser?.title ?? 'Head Coach'}
+                {coach?.title ?? 'Head Coach'}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <span style={gv.badge}><ShieldCheck size={11} style={{ marginRight: 4 }} />{coach?.teamName ?? 'Team'}</span>

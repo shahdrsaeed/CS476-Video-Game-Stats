@@ -3,8 +3,7 @@ import Navbar from '../components/Navbar';
 import { getAllPlayers, getPlayerStats } from '../services/UserApi';
 import { Search, Shield, User, ChevronRight, ChevronLeft, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
 
-const loggedInUser = JSON.parse(localStorage.getItem('user'));
-const userRole = localStorage.getItem('userRole'); // 'coach' or 'player'
+
 
 const rankColor = (rank) => {
   if (!rank) return '#888';
@@ -37,6 +36,10 @@ const TeamSearchView = () => {
   const [modalLoading, setModalLoading] = useState(false);  // ← add this
   const [requests, setRequests] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // moved these statements inside teamsearchview component
+  const loggedInUser = JSON.parse(localStorage.getItem('user'));
+  const userRole = localStorage.getItem('userRole'); // 'coach' or 'player'
 
   // BUG 1 FIX: only fetch requests if logged in as coach
   useEffect(() => {
@@ -350,34 +353,36 @@ const TeamSearchView = () => {
                 <tr>{['AGENT', 'MATCHES', 'WIN%', 'K/D', 'ACS'].map(h => <th key={h} style={modal.th}>{h}</th>)}</tr>
               </thead>
               <tbody>
-                {(selected.topAgents ?? []).map(a => (
-                  <tr key={a.agent?.name ?? a._id}>
-                    <td style={modal.td}>
-                      <strong style={{ color: '#fff' }}>{a.agent?.name ?? 'Unknown'}</strong>
-                    </td>
-                    <td style={modal.td}>{a.matchesPlayed}</td>
-                    <td style={{ ...modal.td, color: '#22c55e', fontWeight: 700 }}>
-                      {a.matchesPlayed ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%' : '0%'}
-                    </td>
-                    <td style={{ ...modal.td, fontWeight: 700 }}>
-                      {a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2)}
-                    </td>
-                    <td style={{ ...modal.td, color: '#ff4655', fontWeight: 700 }}>N/A</td>
-                  </tr>
-                ))}
+                {/* TOP AGENTS */}
+                {(modalLoading ? [] : (selectedStats?.topAgents ?? [])).map(a => (
+                <tr key={a.agent}>
+                  <td style={modal.td}>
+                    <strong style={{ color: '#fff' }}>{a.agent ?? 'Unknown'}</strong>
+                  </td>
+                  <td style={modal.td}>{a.matchesPlayed}</td>
+                  <td style={{ ...modal.td, color: '#22c55e', fontWeight: 700 }}>
+                    {a.matchesPlayed ? ((a.wins / a.matchesPlayed) * 100).toFixed(1) + '%' : '0%'}
+                  </td>
+                  <td style={{ ...modal.td, fontWeight: 700 }}>
+                    {a.deaths === 0 ? a.kills : (a.kills / a.deaths).toFixed(2)}
+                  </td>
+                  <td style={{ ...modal.td, color: '#ff4655', fontWeight: 700 }}>N/A</td>
+                </tr>
+              ))}
               </tbody>
             </table>
 
             <div style={modal.sectionTitle}><Shield size={12} color="#ff4655" style={{ marginRight: 6 }} />TOP MAPS</div>
-            {(selected.topMaps ?? []).map(m => (
-              <div key={m.map?.name ?? m._id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', padding: '8px 0' }}>
-                <span style={{ color: '#fff', fontWeight: 700, flex: 1 }}>{m.map?.name ?? 'Unknown'}</span>
-                <span style={{ fontSize: 11, color: '#555', marginRight: 16 }}>{m.wins}W - {m.losses}L</span>
-                <span style={{ color: '#22c55e', fontWeight: 900 }}>
-                  {m.matchesPlayed ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%' : '0%'}
-                </span>
-              </div>
-            ))}
+            {/* TOP MAPS */}
+            {(modalLoading ? [] : (selectedStats?.topMaps ?? [])).map(m => (
+            <div key={m.map} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1a1f2e', padding: '8px 0' }}>
+              <span style={{ color: '#fff', fontWeight: 700, flex: 1 }}>{m.map ?? 'Unknown'}</span>
+              <span style={{ fontSize: 11, color: '#555', marginRight: 16 }}>{m.wins}W - {m.losses}L</span>
+              <span style={{ color: '#22c55e', fontWeight: 900 }}>
+                {m.matchesPlayed ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%' : '0%'}
+              </span>
+            </div>
+          ))}
           </div>
         </div>
       )}

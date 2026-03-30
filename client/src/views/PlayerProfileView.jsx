@@ -290,22 +290,32 @@ const adapted = {
     winRate: m.matchesPlayed ? ((m.wins / m.matchesPlayed) * 100).toFixed(1) + '%' : '0%',
   })),
 
-  recentMatches: (raw.last20Matches ?? []).map(m => ({
+  recentMatches: (raw.last20Matches ?? []).map(m => {
+  // Find this player's stats within the match
+  const matchPlayer = (m.match?.players ?? []).find(
+    p => p.player?.toString() === raw._id?.toString()
+  );
+  const s = matchPlayer?.stats ?? {};
+  const totalHits = (s.headshots ?? 0) + (s.bodyshots ?? 0) + (s.legshots ?? 0);
+
+  return {
     date:      m.match?.datePlayed ? new Date(m.match.datePlayed).toLocaleDateString() : 'N/A',
     map:       m.match?.map?.name ?? 'N/A',
     result:    m.result === 'Win' ? 'W' : 'L',
     score:     m.match?.score ? `${m.match.score.teamA}:${m.match.score.teamB}` : 'N/A',
-    kd:        m.match?.kd        ?? 'N/A',
-    kda:       m.match?.kda       ?? 'N/A',
-    kills:     m.match?.kills     ?? 0,
-    deaths:    m.match?.deaths    ?? 0,
-    assists:   m.match?.assists   ?? 0,
-    ddDelta:   m.match?.ddDelta   ?? 'N/A',
-    hs:        m.match?.hs        ?? 'N/A',
-    acs:       m.match?.acs       ?? 'N/A',
-    placement: m.match?.placement ?? 'N/A',
+    kills:     s.kills   ?? 'N/A',
+    deaths:    s.deaths  ?? 'N/A',
+    assists:   s.assists ?? 'N/A',
+    kd:        s.deaths  ? (s.kills / s.deaths).toFixed(2) : s.kills ?? 'N/A',
+    kda:       s.kills != null ? `${s.kills}/${s.deaths}/${s.assists}` : 'N/A',
+    hs:        totalHits ? ((s.headshots / totalHits) * 100).toFixed(1) : 'N/A',
+    ddDelta:   s.damageDealt != null && s.damageTaken != null
+                 ? s.damageDealt - s.damageTaken : 'N/A',
+    acs:       'N/A', // requires round count — not available here without populate
+    placement: 'N/A', // not in schema yet
     isWin:     m.result === 'Win',
-  })),
+  };
+}),
 };
 
       setPlayer(adapted);
