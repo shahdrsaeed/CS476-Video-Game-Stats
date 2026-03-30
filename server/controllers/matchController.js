@@ -133,15 +133,42 @@ const simulateMatch = async (req, res) => {
 
     const mapId = "69c98c2c1650185c3c8d8cae";
 
+    const AGENTS  = ['Jett','Reyna','Sage','Omen','Killjoy','Sova','Neon','Cypher'];
+    const WEAPONS = ['Vandal','Phantom','Operator','Sheriff','Spectre'];
+
+    const agentName  = AGENTS[Math.floor(Math.random() * AGENTS.length)];
+    const weaponName = WEAPONS[Math.floor(Math.random() * WEAPONS.length)];
+
+    const numRounds = didWin ? 13 : Math.floor(Math.random() * 8) + 5;
+    const scoreA = didWin ? 13 : numRounds;
+    const scoreB = didWin ? numRounds : 13;
+
+    const rounds = Array.from({ length: numRounds }, (_, i) => ({
+      roundNumber: i + 1,
+      winningTeam: didWin ? team : (team === 'A' ? 'B' : 'A'),
+      players: [{
+        player:      player._id,
+        team,
+        kills:       Math.floor(Math.random() * 3),
+        assists:     Math.random() > 0.7 ? 1 : 0,
+        deaths:      Math.random() > 0.5 ? 1 : 0,
+        survived:    Math.random() > 0.5,
+        traded:      Math.random() > 0.6,
+        damageDealt: Math.floor(Math.random() * 150),
+        damageTaken: Math.floor(Math.random() * 100),
+      }]
+    }));
+
     const newMatch = new Match({
       players: [{
         player: player._id,
-        stats: matchStats,
-        team
+        stats:  matchStats,
+        team,
       }],
       result: { winningTeam },
-      rounds: [],
-      map: mapId
+      rounds,
+      map:   mapId,
+      score: { teamA: scoreA, teamB: scoreB },
     });
 
     await newMatch.save({ session });
@@ -157,6 +184,7 @@ const simulateMatch = async (req, res) => {
       match: newMatch._id,
       result: didWin ? 'Win' : 'Loss'
     });
+
 
     await player.save({ session });
     await session.commitTransaction();

@@ -36,7 +36,7 @@ const MatchSchema = new mongoose.Schema({
   map: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Map',
-    required: true
+    required: false
   },
 
   datePlayed: {
