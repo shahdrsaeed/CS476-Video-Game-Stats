@@ -74,49 +74,62 @@ useEffect(() => {
   };
   fetchPlayers();
 }, []);
-  const handleRequest = async (player) => {
-    // BUG 4 FIX: only block if Pending or Approved — allow re-request after Rejection
-    const status = getRequestStatus(player.username, requests);
-    if (status === 'Pending' || status === 'Approved') return;
 
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/requests/${loggedInUser._id}/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          playerId: player._id,
-          teamId: loggedInUser.teamId,
-        }),
-      });
+ // modified this function
+ const handleRequest = async (player) => {
+  const status = getRequestStatus(player.username, requests);
+  if (status === 'Pending' || status === 'Approved') return;
 
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'Failed to send request');
-      }
+  try {
+    const token = localStorage.getItem('token');
 
-      const newRequest = await res.json();
+    // ← Fetch fresh coach data to get current teamId
+    const freshRes = await fetch(`/api/users/${loggedInUser._id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const freshUser = await freshRes.json();
+    const teamId = freshUser.teamId?._id ?? freshUser.teamId;
 
-      // If a rejected request existed for this player, replace it
-      setRequests(prev => {
-        const filtered = prev.filter(r => r.player?.username !== player.username);
-        return [
-          ...filtered,
-          {
-            _id: newRequest._id,
-            player: { username: player.username },
-            team: { teamName: loggedInUser.teamName },
-            status: 'Pending',
-          },
-        ];
-      });
-    } catch (err) {
-      console.error('Failed to send request:', err);
+    if (!teamId) {
+      console.error('No team assigned to this coach');
+      return;
     }
-  };
+
+    const res = await fetch(`/api/requests/${loggedInUser._id}/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        playerId: player._id,
+        teamId,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.message || 'Failed to send request');
+    }
+
+    const newRequest = await res.json();
+
+    setRequests(prev => {
+      const filtered = prev.filter(r => r.player?.username !== player.username);
+      return [
+        ...filtered,
+        {
+          _id: newRequest._id,
+          player: { username: player.username },
+          team: { teamName: freshUser.teamId?.teamName ?? '' },
+          status: 'Pending',
+        },
+      ];
+    });
+  } catch (err) {
+    console.error('Failed to send request:', err);
+  }
+};
 
   // get individual stats of player when user clicks on "view profile"
   const handleSelectPlayer = async (player) => {

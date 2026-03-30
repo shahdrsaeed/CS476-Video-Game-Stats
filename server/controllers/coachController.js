@@ -45,8 +45,14 @@ const getAggregatedStats = async (req, res) => {
       select: 'rounds players',
     });
     
+    // modified this to return zeroed stats if coach does not have team yet
     if (players.length === 0) {
-      return res.status(404).json({ message: 'No players found for this coach' });
+      return res.status(200).json({
+        averageKd:          '0.00',
+        averageWinRate:     '0.00',
+        averageAcs:         '0.00',
+        totalMatchesPlayed: 0
+      });
     }
 
     // Initialize accumulators

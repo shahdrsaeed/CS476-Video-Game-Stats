@@ -68,7 +68,7 @@ const blendPlayerStats = (prev, match) => {
   const n = prev.matchesPlayed ?? 0;
 
   const newKd      = blend(prev.kdRatio,            match.kd,   n);
-  const newAcs     = blend(prev.acs,                match.acs,  n);
+  const newAcs     = blend(prev.acs,                match.acs,  n); 
   const newHsPct   = blend(prev.headshotPercentage, match.hs,   n);
   const newBodyPct = blend(prev.bodyshotPercentage, match.body, n);
   const newLegsPct = blend(prev.legshotPercentage,  match.legs, n);
@@ -207,6 +207,7 @@ const PlayerProfileView = () => {
   const [justUpdated,   setJustUpdated]   = useState(false);
   const [spinning,      setSpinning]      = useState(false);
 
+  // modified function
   const handleSimulateMatch = async () => {
     if (!playerId) {
       setError('Player ID is missing');
@@ -222,17 +223,34 @@ const PlayerProfileView = () => {
       );
 
       const simulatedMatch = response.data.match;
-      const newStats = response.data.newStats;
 
       const mapResponse = await axios.get(`http://localhost:8080/api/maps/${simulatedMatch.map}`);
       const mapName = mapResponse.data.data.name;
 
       const adaptedMatch = adaptSimulatedMatch(simulatedMatch, playerId, mapName);
 
+      // ← Re-fetch fresh stats from backend instead of manually blending
+      const freshRes = await getPlayerStats(playerId);
+      const raw = freshRes.data;
+
       setPlayer(prev => ({
         ...prev,
-        stats: newStats,
-        recentMatches: [adaptedMatch, ...(prev.recentMatches || [])]
+        // Updated computed stats from backend
+        acs:             raw.acs ?? prev.acs,
+        damagePerRound:  raw.damagePerRound ?? prev.damagePerRound,
+        ddDeltaPerRound: raw.ddDeltaPerRound ?? prev.ddDeltaPerRound,
+        kast:            raw.kast ? raw.kast + '%' : prev.kast,
+        roundWinRate:    raw.roundWinPercentage ? raw.roundWinPercentage + '%' : prev.roundWinRate,
+        killsPerRound:   raw.killsPerRound ?? prev.killsPerRound,
+        kdRatio:         raw.kdRatio ?? prev.kdRatio,
+        winRate:         raw.winRate ?? prev.winRate,
+        headshotPercentage: raw.headshotPercentage ?? prev.headshotPercentage,
+        bodyshotPercentage: raw.bodyshotPercentage ?? prev.bodyshotPercentage,
+        legshotPercentage:  raw.legshotPercentage  ?? prev.legshotPercentage,
+        matchesPlayed:   raw.matchesPlayed ?? prev.matchesPlayed,
+        stats:           raw.stats ?? prev.stats,
+        // Add the adapted match to recent matches
+        recentMatches: [adaptedMatch, ...(prev.recentMatches || [])],
       }));
 
       setJustUpdated(true);

@@ -1,7 +1,8 @@
 const User = require('../models/User');
 const Player = require('../models/Player');
 const Coach = require('../models/Coach');
-const bcrypt = require('bcrypt'); 
+const bcrypt = require('bcrypt');
+const Team = require('../models/Team'); 
 const jwt = require('jsonwebtoken');
 
 // Create (Player or Coach)
@@ -40,14 +41,37 @@ exports.create = async (req, res) => {
         username,
         email,
         password: hashedPassword,
-        imageURL, // add this
+        imageURL,
         ...rest
       });
-    } 
+
+      await user.save();
+
+      // ← Create team and link to coach
+      if (rest.teamName) {
+        const team = new Team({
+          teamName: rest.teamName,
+          coach: user._id,
+          players: [],
+        });
+
+        await team.save();
+
+        // Link team back to coach
+        user.teamId = team._id;
+        await user.save();
+      }
+
+      return res.status(201).json({
+        message: 'User registered successfully',
+        user
+      });
+    }
     else {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
+    // Only reached for Player
     await user.save();
 
     res.status(201).json({
