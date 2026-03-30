@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, RefreshCw } from 'lucide-react';
+import { Shield, User, Target, TrendingUp, Map, Crosshair, Award, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { getUser } from '../services/UserApi';
 import Navbar from '../components/Navbar';
+import axios from 'axios';
 
 // ── Rank color helper ──
 const rankColor = (rank) => {
@@ -16,7 +17,6 @@ const rankColor = (rank) => {
 const resultColor = (r) => (r === 'W' ? '#22c55e' : '#ff4655');
 
 // ── Weighted-blend helper ──
-// Blends a single numeric value: (old * n + newVal) / (n + 1)
 const blend = (oldVal, newVal, n) => {
   const o = parseFloat(oldVal) || 0;
   const v = parseFloat(newVal) || 0;
@@ -31,7 +31,6 @@ const WEAPON_TYPES = { Vandal: 'Rifle', Phantom: 'Rifle', Operator: 'Sniper', Sh
 const PLACEMENTS = ['MVP', '2nd', '3rd', '4th', '5th'];
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-// ── Generate one fake match (now includes agent / weapon / shot breakdown) ──
 const generateFakeMatch = () => {
   const kills  = rand(10, 35);
   const deaths = rand(8, 25);
@@ -64,48 +63,48 @@ const generateFakeMatch = () => {
   };
 };
 
-// ── Blend all player-level stats after a new match ──
 const blendPlayerStats = (prev, match) => {
-  const n = prev.matchesPlayed ?? 0; // matches BEFORE this one
+  const n = prev.matchesPlayed ?? 0;
 
-  // ── Stat cards ──
-  const newKd      = blend(prev.kdRatio,             match.kd,  n);
-  const newAcs     = blend(prev.stats?.acs,          match.acs, n);
-  const newHsPct   = blend(prev.headshotPercentage,  match.hs,  n);
-  const newBodyPct = blend(prev.bodyshotPercentage,  match.body, n);
-  const newLegsPct = blend(prev.legshotPercentage,   match.legs, n);
+  const newKd      = blend(prev.kdRatio,            match.kd,   n);
+  const newAcs     = blend(prev.acs,                match.acs,  n);
+  const newHsPct   = blend(prev.headshotPercentage, match.hs,   n);
+  const newBodyPct = blend(prev.bodyshotPercentage, match.body, n);
+  const newLegsPct = blend(prev.legshotPercentage,  match.legs, n);
+
+  const newDamagePerRound  = blend(parseFloat(prev.damagePerRound)  || 0, match.acs,     n);
+  const newDdDeltaPerRound = blend(parseFloat(prev.ddDeltaPerRound) || 0, match.ddDelta, n);
+  const newKast            = blend(parseFloat(prev.kast)            || 0, rand(55, 85),  n);
+  const newRoundWinRate    = blend(parseFloat(prev.roundWinRate)    || 0, match.isWin ? rand(52, 65) : rand(35, 49), n);
 
   const newWins    = (prev.stats?.wins   ?? 0) + (match.isWin ? 1 : 0);
   const newLosses  = (prev.stats?.losses ?? 0) + (match.isWin ? 0 : 1);
   const newMatches = n + 1;
   const newWinRate = ((newWins / newMatches) * 100).toFixed(1) + '%';
 
-  // ── Detailed stats ──
   const newKills   = (prev.stats?.kills   ?? 0) + match.kills;
   const newDeaths  = (prev.stats?.deaths  ?? 0) + match.deaths;
   const newAssists = (prev.stats?.assists ?? 0) + match.assists;
-  const newKadRatio = parseFloat(
-    ((newKills + newAssists) / Math.max(newDeaths, 1)).toFixed(2)
-  );
-  const newKillsPerRound = parseFloat((newKills / (newMatches * 13)).toFixed(2)); // approx 13 rounds
+  const newKadRatio = parseFloat(((newKills + newAssists) / Math.max(newDeaths, 1)).toFixed(2));
+  const newKillsPerRound = parseFloat((newKills / (newMatches * 13)).toFixed(2));
 
-  // ── Top Agents ──
-  const topAgents = blendTopAgents(prev.topAgents ?? [], match);
-
-  // ── Top Maps ──
-  const topMaps = blendTopMaps(prev.topMaps ?? [], match);
-
-  // ── Top Weapons ──
+  const topAgents  = blendTopAgents(prev.topAgents  ?? [], match);
+  const topMaps    = blendTopMaps(prev.topMaps       ?? [], match);
   const topWeapons = blendTopWeapons(prev.topWeapons ?? [], match);
 
   return {
     ...prev,
-    matchesPlayed: newMatches,
+    matchesPlayed:      newMatches,
     kdRatio:            newKd,
     winRate:            newWinRate,
     headshotPercentage: newHsPct,
     bodyshotPercentage: newBodyPct,
     legshotPercentage:  newLegsPct,
+    acs:                newAcs,
+    damagePerRound:     newDamagePerRound,
+    ddDeltaPerRound:    newDdDeltaPerRound,
+    kast:               newKast,
+    roundWinRate:       newRoundWinRate,
     stats: {
       ...prev.stats,
       wins:    newWins,
@@ -113,7 +112,6 @@ const blendPlayerStats = (prev, match) => {
       kills:   newKills,
       deaths:  newDeaths,
       assists: newAssists,
-      acs:     newAcs,
     },
     kadRatio:      newKadRatio,
     killsPerRound: newKillsPerRound,
@@ -123,7 +121,6 @@ const blendPlayerStats = (prev, match) => {
   };
 };
 
-// ── Blend top-agents list ──
 const blendTopAgents = (agents, match) => {
   const existing = agents.find(a => a.name === match.agent);
   if (existing) {
@@ -141,19 +138,16 @@ const blendTopAgents = (agents, match) => {
       };
     });
   }
-  // new agent — append (cap list at 5)
-  const newAgent = {
+  return [...agents, {
     name:    match.agent,
     hours:   'N/A',
     matches: 1,
     winRate: match.isWin ? '100.0%' : '0.0%',
     kd:      match.kd,
     acs:     match.acs,
-  };
-  return [...agents, newAgent].slice(0, 5);
+  }].slice(0, 5);
 };
 
-// ── Blend top-maps list ──
 const blendTopMaps = (maps, match) => {
   const existing = maps.find(m => m.map === match.map);
   if (existing) {
@@ -169,69 +163,86 @@ const blendTopMaps = (maps, match) => {
       }
     );
   }
-  const newMap = {
+  return [...maps, {
     map:     match.map,
     wins:    match.isWin ? 1 : 0,
     losses:  match.isWin ? 0 : 1,
     winRate: match.isWin ? '100.0%' : '0.0%',
-  };
-  return [...maps, newMap].slice(0, 5);
+  }].slice(0, 5);
 };
 
-// ── Blend top-weapons list ──
 const blendTopWeapons = (weapons, match) => {
   const existing = weapons.find(w => w.weapon === match.weapon);
   if (existing) {
-    const n = existing.kills; // weight by total kills
+    const n = existing.kills;
     return weapons.map(w => {
       if (w.weapon !== match.weapon) return w;
-      const newKills = w.kills + match.kills;
       return {
         ...w,
-        kills:       newKills,
+        kills:       w.kills + match.kills,
         headshotPct: blend(parseFloat(w.headshotPct), match.hs,   n).toFixed(1) + '%',
         bodyPct:     blend(parseFloat(w.bodyPct),     match.body, n).toFixed(1) + '%',
         legsPct:     blend(parseFloat(w.legsPct),     match.legs, n).toFixed(1) + '%',
       };
     });
   }
-  const newWeapon = {
+  return [...weapons, {
     weapon:      match.weapon,
     type:        WEAPON_TYPES[match.weapon] ?? '',
     kills:       match.kills,
     headshotPct: match.hs   + '%',
     bodyPct:     match.body + '%',
     legsPct:     match.legs + '%',
-  };
-  return [...weapons, newWeapon].slice(0, 5);
+  }].slice(0, 5);
 };
-
 
 // ─────────────────────────────────────────────
 const PlayerProfileView = () => {
   const [player,        setPlayer]        = useState(null);
   const [loading,       setLoading]       = useState(true);
+  const [expandedMatch, setExpandedMatch] = useState(null);
+  const [error,         setError]         = useState(null);
+  const [playerId,      setPlayerId]      = useState(null);
   const [justUpdated,   setJustUpdated]   = useState(false);
   const [spinning,      setSpinning]      = useState(false);
 
-  // ── Simulate button handler ──
-  const handleSimulateMatch = () => {
+  const handleSimulateMatch = async () => {
+    if (!playerId) {
+      setError('Player ID is missing');
+      return;
+    }
+
+    setLoading(true);
     setSpinning(true);
-    setTimeout(() => {
-      const match = generateFakeMatch();
 
-      setPlayer(prev => {
-        const blended = blendPlayerStats(prev, match);
-        return {
-          ...blended,
-          recentMatches: [match, ...(prev.recentMatches ?? []).slice(0, 19)],
-        };
-      });
+    try {
+      const response = await axios.put(
+        `http://localhost:8080/api/matches/${playerId}/simulate-match`
+      );
 
-      setSpinning(false);
+      const simulatedMatch = response.data.match;
+      const newStats = response.data.newStats;
+
+      const mapResponse = await axios.get(`http://localhost:8080/api/maps/${simulatedMatch.map}`);
+      const mapName = mapResponse.data.data.name;
+
+      const adaptedMatch = adaptSimulatedMatch(simulatedMatch, playerId, mapName);
+
+      setPlayer(prev => ({
+        ...prev,
+        stats: newStats,
+        recentMatches: [adaptedMatch, ...(prev.recentMatches || [])]
+      }));
+
       setJustUpdated(true);
       setTimeout(() => setJustUpdated(false), 2500);
-    }, 800);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to simulate match');
+    } finally {
+      setLoading(false);
+      setSpinning(false);
+    }
   };
 
   useEffect(() => {
@@ -240,8 +251,10 @@ const PlayerProfileView = () => {
         const stored = localStorage.getItem('user');
         if (!stored) return;
 
-        const { _id } = JSON.parse(stored);
-        const res = await getUser(_id);
+        const { _id } = JSON.parse(stored); // Extract the player ID from localStorage
+        setPlayerId(_id); // Store it in the state for later use
+
+        const res = await getUser(_id); // Fetch player data using the player ID
         const raw = res.data;
 
         const adapted = {
@@ -274,12 +287,12 @@ const PlayerProfileView = () => {
           topWeapons: (raw.topWeapons ?? []).map(w => {
             const total = (w.headshotKills ?? 0) + (w.bodyshotKills ?? 0) + (w.legshotKills ?? 0);
             return {
-              weapon:      w.weapon?.name ?? 'Unknown',
-              type:        w.weapon?.type ?? '',
-              kills:       w.totalKills   ?? 0,
+              weapon: w.weapon?.name ?? 'Unknown',
+              type: w.weapon?.type ?? '',
+              kills: w.totalKills ?? 0,
               headshotPct: total ? ((w.headshotKills / total) * 100).toFixed(1) + '%' : '0%',
-              bodyPct:     total ? ((w.bodyshotKills  / total) * 100).toFixed(1) + '%' : '0%',
-              legsPct:     total ? ((w.legshotKills   / total) * 100).toFixed(1) + '%' : '0%',
+              bodyPct: total ? ((w.bodyshotKills / total) * 100).toFixed(1) + '%' : '0%',
+              legsPct: total ? ((w.legshotKills / total) * 100).toFixed(1) + '%' : '0%',
             };
           }),
 
@@ -314,16 +327,34 @@ const PlayerProfileView = () => {
           })),
         };
 
-        setPlayer(adapted);
+        setPlayer(adapted); // Set the player data
       } catch (err) {
         console.error('Failed to fetch player:', err);
+        setError('Failed to fetch player data');
       } finally {
-        setLoading(false);
+        setLoading(false); // Hide loading spinner
       }
     };
 
     fetchPlayer();
-  }, []);
+  }, []); // Run once on component mount
+
+  const adaptSimulatedMatch = (match, playerId, mapName) => {
+    const playerData = match.players.find(p => p.player === playerId); // get stats for the current player
+
+    return {
+      date: new Date(match.datePlayed).toLocaleDateString(), // format date
+      map: mapName, // now use the mapName directly
+      result: match.result.winningTeam === playerData.team ? 'W' : 'L', // W for win, L for loss
+      score: `${match.score.teamA}-${match.score.teamB}`, // team A vs team B score
+      kd: (playerData.stats.kills / (playerData.stats.deaths || 1)).toFixed(2), // kills/deaths ratio
+      kda: ((playerData.stats.kills + playerData.stats.assists) / (playerData.stats.deaths || 1)).toFixed(2), // (kills + assists) / deaths
+      ddDelta: playerData.stats.damageDealt - playerData.stats.damageTaken, // damage delta
+      hs: ((playerData.stats.headshots / (playerData.stats.totalHits || 1)) * 100).toFixed(1), // headshot percentage
+      acs: playerData.stats.damageDealt, // average combat score (ACS)
+      placement: 'N/A', // or 'MVP' if you have logic for determining MVP
+    };
+  };
 
   if (loading) return <div style={{ color: '#fff', padding: 40 }}>Loading...</div>;
   if (!player)  return <div style={{ color: '#fff', padding: 40 }}>No player data found.</div>;
