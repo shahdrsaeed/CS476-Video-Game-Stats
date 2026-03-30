@@ -4,7 +4,6 @@ const {
   calculateRoundWinPercentage,
   calculateKAST,
   calculateDDDeltaPerRound,
-  calculateACS,             // added this
   calculateKillsPerRound,   // ← add
   calculateDamagePerRound,  // ← add
   calculateACS,
@@ -64,11 +63,15 @@ const getPlayerStats = async (req, res) => { // modified function to get necessa
       .populate({
         path: 'last20Matches.match',
         select: 'rounds players score map datePlayed result',
-        populate: { path: 'map', select: 'name' }
+         populate: [
+          { path: 'map', select: 'name' },
+          { path: 'rounds.players.player', select: '_id' }  // ← add this
+        ]
       })
-      .populate('topAgents.agent', 'name')
-      .populate('topWeapons.weapon', 'name type')
-      .populate('topMaps.map', 'name');
+      // removed since no longer in player schema
+      // .populate('topAgents.agent', 'name')
+      // .populate('topWeapons.weapon', 'name type')
+      // .populate('topMaps.map', 'name');
 
     if (!player) return res.status(404).json({ message: 'Player not found' });
 
@@ -144,8 +147,8 @@ const getAllPlayers = async (req, res) => {
     const players = await Player.find(query)
       .select('-password')
       .populate('teamId', 'teamName')        // ← add this
-      .populate('topAgents.agent', 'name')   // ← add this for modal
-      .populate('topMaps.map', 'name');      // ← add this for modal
+      // .populate('topAgents.agent', 'name')   // remove since no longer in player schema
+      // .populate('topMaps.map', 'name');      // remove since no longer in player schema
 
     res.json(players);
   } catch (err) {

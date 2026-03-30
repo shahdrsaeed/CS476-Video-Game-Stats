@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-import { getAllPlayers } from '../services/UserApi';
+import { getAllPlayers, getPlayerStats } from '../services/UserApi';
 import { Search, Shield, User, ChevronRight, ChevronLeft, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
 
 const loggedInUser = JSON.parse(localStorage.getItem('user'));

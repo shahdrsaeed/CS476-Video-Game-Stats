@@ -239,11 +239,9 @@ const PlayerProfileView = () => {
     const fetchPlayer = async () => {
       try {
         const stored = localStorage.getItem('user');
-        console.log('stored user:', stored); // ← add this
         if (!stored) return;
 
         const { _id } = JSON.parse(stored);
-        console.log('_id:', _id); // ← and this
         const res = await getPlayerStats(_id);  // ← use new endpoint
         const raw = res.data;
 

@@ -9,8 +9,9 @@ const getPlayers = async (req, res) => {
     // added this so that player cards in front end can have the data they need
     .select('-password')
       .populate('teamId', 'teamName')
-      .populate('topAgents.agent', 'name')
-      .populate('topMaps.map', 'name');
+      // remove since these are no longer in player schema
+      // .populate('topAgents.agent', 'name')
+      // .populate('topMaps.map', 'name');
 
     res.status(200).json(players);
   } catch (err) {
