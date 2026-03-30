@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const UserFactory = require('../factories/UserFactory');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 // Create (Player or Coach)
