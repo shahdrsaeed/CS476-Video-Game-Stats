@@ -207,7 +207,6 @@ const PlayerProfileView = () => {
   const [justUpdated,   setJustUpdated]   = useState(false);
   const [spinning,      setSpinning]      = useState(false);
 
-  // modified function
   const handleSimulateMatch = async () => {
     if (!playerId) {
       setError('Player ID is missing');
@@ -218,42 +217,61 @@ const PlayerProfileView = () => {
     setSpinning(true);
 
     try {
-      const response = await axios.put(
-        `/api/matches/${playerId}/simulate-match`
-      );
-
+      const response = await axios.put(`/api/matches/${playerId}/simulate-match`);
       const simulatedMatch = response.data.match;
 
-      const mapResponse = await axios.get(
-        `/api/maps/${simulatedMatch.map}`
-      );
+      const mapResponse = await axios.get(`/api/maps/${simulatedMatch.map}`);
       const mapName = mapResponse.data.data.name;
 
       const adaptedMatch = adaptSimulatedMatch(simulatedMatch, playerId, mapName);
 
-      // ← Re-fetch fresh stats from backend instead of manually blending
+      // Re-fetch fresh stats from backend
       const freshRes = await getPlayerStats(playerId);
       const raw = freshRes.data;
 
-      setPlayer(prev => ({
-        ...prev,
-        // Updated computed stats from backend
-        acs:             raw.acs ?? prev.acs,
-        damagePerRound:  raw.damagePerRound ?? prev.damagePerRound,
-        ddDeltaPerRound: raw.ddDeltaPerRound ?? prev.ddDeltaPerRound,
-        kast:            raw.kast ? raw.kast + '%' : prev.kast,
-        roundWinRate:    raw.roundWinPercentage ? raw.roundWinPercentage + '%' : prev.roundWinRate,
-        killsPerRound:   raw.killsPerRound ?? prev.killsPerRound,
-        kdRatio:         raw.kdRatio ?? prev.kdRatio,
-        winRate:         raw.winRate ?? prev.winRate,
-        headshotPercentage: raw.headshotPercentage ?? prev.headshotPercentage,
-        bodyshotPercentage: raw.bodyshotPercentage ?? prev.bodyshotPercentage,
-        legshotPercentage:  raw.legshotPercentage  ?? prev.legshotPercentage,
-        matchesPlayed:   raw.matchesPlayed ?? prev.matchesPlayed,
-        stats:           raw.stats ?? prev.stats,
-        // Add the adapted match to recent matches
-        recentMatches: [adaptedMatch, ...(prev.recentMatches || [])],
-      }));
+      // Pick random agent/weapon for frontend blending
+      const agentName  = AGENTS[Math.floor(Math.random()  * AGENTS.length)];
+      const weaponName = WEAPONS[Math.floor(Math.random() * WEAPONS.length)];
+
+      // Build a match object for blendPlayerStats so tops get updated
+      const matchForBlend = {
+        agent:   agentName,
+        weapon:  weaponName,
+        map:     mapName,
+        kills:   simulatedMatch.players[0]?.stats?.kills  ?? 0,
+        deaths:  simulatedMatch.players[0]?.stats?.deaths ?? 1,
+        assists: simulatedMatch.players[0]?.stats?.assists ?? 0,
+        hs:      parseFloat(adaptedMatch.hs) || 0,
+        body:    100 - (parseFloat(adaptedMatch.hs) || 0),
+        legs:    0,
+        acs:     adaptedMatch.acs,
+        ddDelta: adaptedMatch.ddDelta,
+        isWin:   adaptedMatch.result === 'W',
+        kd:      parseFloat(adaptedMatch.kd),
+      };
+
+      setPlayer(prev => {
+        const blended = blendPlayerStats(prev, matchForBlend);
+        return {
+          ...blended,
+          // Override blended stats with accurate backend values
+          acs:                raw.acs             ?? blended.acs,
+          damagePerRound:     raw.damagePerRound  ?? blended.damagePerRound,
+          ddDeltaPerRound:    raw.ddDeltaPerRound ?? blended.ddDeltaPerRound,
+          kast:               raw.kast ? raw.kast + '%' : blended.kast,
+          roundWinRate:       raw.roundWinPercentage ? raw.roundWinPercentage + '%' : blended.roundWinRate,
+          killsPerRound:      raw.killsPerRound   ?? blended.killsPerRound,
+          kdRatio:            raw.kdRatio         ?? blended.kdRatio,
+          winRate:            raw.winRate         ?? blended.winRate,
+          headshotPercentage: raw.headshotPercentage ?? blended.headshotPercentage,
+          bodyshotPercentage: raw.bodyshotPercentage ?? blended.bodyshotPercentage,
+          legshotPercentage:  raw.legshotPercentage  ?? blended.legshotPercentage,
+          matchesPlayed:      raw.matchesPlayed   ?? blended.matchesPlayed,
+          stats:              raw.stats           ?? blended.stats,
+          // topAgents, topMaps, topWeapons come from blended (frontend)
+          recentMatches: [adaptedMatch, ...(prev.recentMatches || [])],
+        };
+      });
 
       setJustUpdated(true);
       setTimeout(() => setJustUpdated(false), 2500);
