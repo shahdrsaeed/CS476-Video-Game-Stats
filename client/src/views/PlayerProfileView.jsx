@@ -219,12 +219,14 @@ const PlayerProfileView = () => {
 
     try {
       const response = await axios.put(
-        `http://localhost:8080/api/matches/${playerId}/simulate-match`
+        `/api/matches/${playerId}/simulate-match`
       );
 
       const simulatedMatch = response.data.match;
 
-      const mapResponse = await axios.get(`http://localhost:8080/api/maps/${simulatedMatch.map}`);
+      const mapResponse = await axios.get(
+        `/api/maps/${simulatedMatch.map}`
+      );
       const mapName = mapResponse.data.data.name;
 
       const adaptedMatch = adaptSimulatedMatch(simulatedMatch, playerId, mapName);
