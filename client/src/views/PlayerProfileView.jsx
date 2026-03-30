@@ -296,18 +296,6 @@ const adapted = {
     acs:     'N/A',
   })),
 
-  topWeapons: (raw.topWeapons ?? []).map(w => {
-    const total = (w.headshotKills ?? 0) + (w.bodyshotKills ?? 0) + (w.legshotKills ?? 0);
-    return {
-      weapon:      w.weapon?.name ?? 'Unknown',
-      type:        w.weapon?.type ?? '',
-      kills:       w.totalKills ?? 0,
-      headshotPct: total ? ((w.headshotKills / total) * 100).toFixed(1) + '%' : '0%',
-      bodyPct:     total ? ((w.bodyshotKills  / total) * 100).toFixed(1) + '%' : '0%',
-      legsPct:     total ? ((w.legshotKills   / total) * 100).toFixed(1) + '%' : '0%',
-    };
-  }),
-
   topMaps: (raw.topMaps ?? []).map(m => ({
       map:     m.map?.name ?? 'Unknown',
       wins:    m.wins ?? 0,
