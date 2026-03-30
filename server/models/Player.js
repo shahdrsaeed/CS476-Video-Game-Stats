@@ -60,32 +60,6 @@ const PlayerSchema = new mongoose.Schema({
     legshots: { type: Number, default: 0, min: 0 }
   },
 
-  topWeapons: [{ // top 3 weapons for the player with stats
-    weapon: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Weapon',
-      required: true
-    },
-    totalKills: { type: Number, default: 0, min: 0 },
-    headshotKills: { type: Number, default: 0, min: 0 },
-    bodyshotKills: { type: Number, default: 0, min: 0 },
-    legshotKills: { type: Number, default: 0, min: 0 }
-  }],
-
-  topAgents: [{ // top 3 agents used for the player with stats
-    agent: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Agent',
-      required: true
-    },
-    matchesPlayed: { type: Number, default: 0, min: 0 },
-    wins: { type: Number, default: 0, min: 0 },
-    losses: { type: Number, default: 0, min: 0 },
-    kills: { type: Number, default: 0, min: 0 },
-    deaths: { type: Number, default: 0, min: 0 },
-    assists: { type: Number, default: 0, min: 0 }
-  }],
-
   last20Matches: [{  // review of last 20 matches
     match: {
       type: mongoose.Schema.Types.ObjectId,
@@ -97,17 +71,6 @@ const PlayerSchema = new mongoose.Schema({
       enum: ['Win', 'Loss'],
       required: true
     }
-  }],
-
-  topMaps: [{ // top 3 maps for the player, sorted by highest win rate
-    map: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Map',
-      required: true
-    },
-    matchesPlayed: { type: Number, default: 0, min: 0 },
-    wins: { type: Number, default: 0, min: 0 },
-    losses: { type: Number, default: 0, min: 0 }
   }]
 
 }, {

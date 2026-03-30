@@ -1,44 +1,42 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Shield, User, Users, ClipboardList, LayoutDashboard, LogOut, Search } from 'lucide-react';
+import { Shield, User, Users, ClipboardList, LayoutDashboard, LogOut, Search, Clock } from 'lucide-react';
 
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const role = localStorage.getItem('userRole') || 'player';
+  const role  = localStorage.getItem('userRole') || 'player';
   const token = localStorage.getItem('token');
 
-  // sign out clears localStorage and redirects to login
   const handleSignOut = () => {
     localStorage.clear();
     navigate('/login');
   };
 
   const links = [
-    { label: 'OVERVIEW', path: '/general', icon: <LayoutDashboard size={14} /> },
-    { label: 'MY PROFILE', path: '/player', icon: <User size={14} />, playerOnly: true },
-    { label: 'TEAM SEARCH', path: '/search', icon: <Search size={14} /> },
-    { label: 'COACH PANEL', path: '/coach', icon: <Users size={14} />, coachOnly: true },
-    { label: 'REGISTRATIONS', path: '/registrations', icon: <ClipboardList size={14} />, coachOnly: true },
+    { label: 'OVERVIEW',      path: '/general',      icon: <LayoutDashboard size={14} /> },
+    { label: 'MY PROFILE',    path: '/player',        icon: <User size={14} />,          playerOnly: true },
+    { label: 'TEAM SEARCH',   path: '/search',        icon: <Search size={14} /> },
+    { label: 'COACH PANEL',   path: '/coach',         icon: <Users size={14} />,         coachOnly: true },
+    { label: 'MY REQUESTS',   path: '/pending',       icon: <Clock size={14} />,         coachOnly: true },
+    { label: 'REGISTRATIONS', path: '/registrations', icon: <ClipboardList size={14} />, playerOnly: true },
   ];
 
   const visibleLinks = links.filter(l => {
-    if (l.coachOnly) return role === 'coach';
+    if (l.coachOnly)  return role === 'coach';
     if (l.playerOnly) return role === 'player';
     return true;
   });
 
   return (
     <div style={styles.nav}>
-      {/* Logo */}
       <div style={styles.logo} onClick={() => navigate('/general')}>
         <div style={styles.logoIcon}><Shield size={16} color="#ff4655" /></div>
         <span style={styles.logoText}>TRACKER<span style={{ color: '#ff4655' }}>.DB</span></span>
       </div>
 
-      {/* Nav links */}
       <div style={styles.links}>
-        {token ? ( // Only show the links if the user is logged in
+        {token ? (
           visibleLinks.map(link => {
             const active = location.pathname === link.path;
             return (
@@ -58,8 +56,7 @@ const Navbar = () => {
         )}
       </div>
 
-      {/* Sign out */}
-      {token && ( // Only show the sign-out button if the user is logged in
+      {token && (
         <button style={styles.logoutBtn} onClick={handleSignOut}>
           <LogOut size={14} style={{ marginRight: 6 }} />
           SIGN OUT
