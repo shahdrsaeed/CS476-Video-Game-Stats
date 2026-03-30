@@ -3,8 +3,6 @@ import Navbar from '../components/Navbar';
 import { getAllPlayers, getPlayerStats } from '../services/UserApi';
 import { Search, Shield, User, ChevronRight, ChevronLeft, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
 
-
-
 const rankColor = (rank) => {
   if (!rank) return '#888';
   if (rank.includes('RADIANT')) return '#ffffa0';
@@ -43,38 +41,39 @@ const TeamSearchView = () => {
 
   // BUG 1 FIX: only fetch requests if logged in as coach
   useEffect(() => {
-    const fetchRequests = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`/api/requests?coachId=${loggedInUser._id}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Unauthorized');
-        const data = await res.json();
-        setRequests(data);
-      } catch (err) {
-        console.error('Failed to fetch requests:', err);
-        setRequests([]);
-      }
-    };
-    // BUG 1 FIX: was loggedInUser?.role === 'Coach' — now uses userRole from localStorage
-    if (userRole === 'coach') fetchRequests();
-  }, []);
+  const fetchRequests = async () => {
+    try {
+      const loggedInUser = JSON.parse(localStorage.getItem('user'));
+      const userRole = localStorage.getItem('userRole');
+      if (!loggedInUser || userRole !== 'coach') return;
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/requests?coachId=${loggedInUser._id}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Unauthorized');
+      const data = await res.json();
+      setRequests(data);
+    } catch (err) {
+      console.error('Failed to fetch requests:', err);
+      setRequests([]);
+    }
+  };
+  fetchRequests();
+}, []);
 
-  useEffect(() => {
-    const fetchPlayers = async () => {
-      try {
-        const res = await getAllPlayers();
-        setPlayers(res.data);
-      } catch (err) {
-        console.error('Failed to fetch players:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPlayers();
-  }, []);
-
+useEffect(() => {
+  const fetchPlayers = async () => {
+    try {
+      const res = await getAllPlayers();
+      setPlayers(res.data);
+    } catch (err) {
+      console.error('Failed to fetch players:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchPlayers();
+}, []);
   const handleRequest = async (player) => {
     // BUG 4 FIX: only block if Pending or Approved — allow re-request after Rejection
     const status = getRequestStatus(player.username, requests);

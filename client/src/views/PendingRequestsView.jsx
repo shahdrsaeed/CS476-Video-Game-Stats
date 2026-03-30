@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { Clock, X, CheckCircle, XCircle, Users } from 'lucide-react';
 
-const loggedInUser = JSON.parse(localStorage.getItem('user'));
+// const loggedInUser = JSON.parse(localStorage.getItem('user'));
 
 const rankColor = (rank) => {
   if (!rank) return '#888';
@@ -140,6 +140,8 @@ const PendingRequestsView = () => {
 useEffect(() => {
   const fetchRequests = async () => {
     try {
+      const loggedInUser = JSON.parse(localStorage.getItem('user'));
+      if (!loggedInUser) return;
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/requests?coachId=${loggedInUser._id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -147,7 +149,6 @@ useEffect(() => {
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
 
-      // ── ADD THIS BLOCK ──
       const deduped = data.reduce((acc, req) => {
         const key = req.player?._id;
         if (!key) return [...acc, req];
@@ -157,9 +158,8 @@ useEffect(() => {
           ? acc.map(r => r.player?._id === key ? req : r)
           : acc;
       }, []);
-      // ── END BLOCK ──
 
-      setRequests(deduped); // <-- changed from setRequests(data)
+      setRequests(deduped);
     } catch (err) {
       console.error('Failed to fetch requests:', err);
     } finally {
@@ -174,13 +174,12 @@ const handleCancel = async (requestId) => {
   try {
     setCancelling(requestId);
     const token = localStorage.getItem('token');
-    const res = await fetch(`/api/requests/${requestId}/cancel`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    const res = await fetch(`/api/requests/${requestId}/reject`, {
+  method: 'DELETE',
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+});
     
     // Log the actual error response
     if (!res.ok) {
