@@ -3,8 +3,8 @@ import Navbar from '../components/Navbar';
 import { getAllPlayers } from '../services/UserApi';
 import { Search, Shield, User, ChevronRight, ChevronLeft, X, UserPlus, Clock, CheckCircle } from 'lucide-react';
 
-const loggedInUser = JSON.parse(localStorage.getItem('user'));
-const userRole = localStorage.getItem('userRole'); // 'coach' or 'player'
+// const loggedInUser = JSON.parse(localStorage.getItem('user'));
+// const userRole = localStorage.getItem('userRole'); // 'coach' or 'player'
 
 const rankColor = (rank) => {
   if (!rank) return '#888';
@@ -29,6 +29,8 @@ const getRequestId = (playerName, requests = []) => {
 const PLAYERS_PER_PAGE = 8;
 
 const TeamSearchView = () => {
+  const loggedInUser = JSON.parse(localStorage.getItem('user'));
+  const userRole = localStorage.getItem('userRole'); // 'coach' or 'player'
   const [query, setQuery] = useState('');
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,40 +38,40 @@ const TeamSearchView = () => {
   const [requests, setRequests] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // BUG 1 FIX: only fetch requests if logged in as coach
   useEffect(() => {
-    const fetchRequests = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`/api/requests?coachId=${loggedInUser._id}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Unauthorized');
-        const data = await res.json();
-        setRequests(data);
-      } catch (err) {
-        console.error('Failed to fetch requests:', err);
-        setRequests([]);
-      }
-    };
-    // BUG 1 FIX: was loggedInUser?.role === 'Coach' — now uses userRole from localStorage
-    if (userRole === 'coach') fetchRequests();
-  }, []);
+  const fetchRequests = async () => {
+    try {
+      const loggedInUser = JSON.parse(localStorage.getItem('user'));
+      const userRole = localStorage.getItem('userRole');
+      if (!loggedInUser || userRole !== 'coach') return;
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/requests?coachId=${loggedInUser._id}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Unauthorized');
+      const data = await res.json();
+      setRequests(data);
+    } catch (err) {
+      console.error('Failed to fetch requests:', err);
+      setRequests([]);
+    }
+  };
+  fetchRequests();
+}, []);
 
-  useEffect(() => {
-    const fetchPlayers = async () => {
-      try {
-        const res = await getAllPlayers();
-        setPlayers(res.data);
-      } catch (err) {
-        console.error('Failed to fetch players:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPlayers();
-  }, []);
-
+useEffect(() => {
+  const fetchPlayers = async () => {
+    try {
+      const res = await getAllPlayers();
+      setPlayers(res.data);
+    } catch (err) {
+      console.error('Failed to fetch players:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchPlayers();
+}, []);
   const handleRequest = async (player) => {
     // BUG 4 FIX: only block if Pending or Approved — allow re-request after Rejection
     const status = getRequestStatus(player.username, requests);

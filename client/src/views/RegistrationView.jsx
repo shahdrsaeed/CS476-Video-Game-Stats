@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { Check, X, Clock, CheckCircle, XCircle, ClipboardList, Shield, Users, TrendingUp } from 'lucide-react';
 
-const loggedInUser = JSON.parse(localStorage.getItem('user'));
+// const loggedInUser = JSON.parse(localStorage.getItem('user'));
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '—';
@@ -40,10 +40,12 @@ const RegistrationView = () => {
   const [processing, setProcessing] = useState(null);
   const token = localStorage.getItem('token');
 
-  useEffect(() => {
+useEffect(() => {
     const fetchRequests = async () => {
       try {
-        // BUG 2 FIX: filter by playerId so player only sees requests sent to them
+        const loggedInUser = JSON.parse(localStorage.getItem('user'));
+        if (!loggedInUser) return;
+        const token = localStorage.getItem('token');
         const res = await fetch(`/api/requests?playerId=${loggedInUser._id}`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
