@@ -173,30 +173,37 @@ const GeneralView = () => {
   const [players, setPlayers] = useState([]);
   const [coach,   setCoach]   = useState(null);
   const [loading, setLoading] = useState(true);
+  const [teamId, setTeamId] = useState(null); // ← add this state
 
+// modified this
   useEffect(() => {
     const load = async () => {
       try {
-        const token  = localStorage.getItem('token');
-        const teamId = loggedInUser?.teamId;
+        const token = localStorage.getItem('token');
 
-        // 1. Fetch coach profile
+        // 1. Fetch fresh user profile
         if (loggedInUser?._id) {
           const cr = await fetch(`/api/users/${loggedInUser._id}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          if (cr.ok) setCoach(await cr.json());
+          if (cr.ok) {
+            const freshUser = await cr.json();
+            setCoach(freshUser);
+
+            const freshTeamId = freshUser.teamId;
+            setTeamId(freshTeamId); // ← use fresh teamId
+
+            if (!freshTeamId) { setLoading(false); return; }
+
+            // 2. Fetch roster using fresh teamId
+            const pr = await fetch(`/api/teams/${freshTeamId}/players`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!pr.ok) throw new Error('Failed to fetch players');
+            const data = await pr.json();
+            setPlayers(data.map(adaptPlayer));
+          }
         }
-
-        if (!teamId) { setLoading(false); return; }
-
-        // 2. Fetch roster — same endpoint as CoachPanel
-        const pr = await fetch(`/api/teams/${teamId}/players`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!pr.ok) throw new Error('Failed to fetch players');
-        const data = await pr.json();
-        setPlayers(data.map(adaptPlayer));
       } catch (err) {
         console.error('GeneralView load error:', err);
       } finally {
@@ -214,16 +221,16 @@ const GeneralView = () => {
     </div>
   );
 
-  if (!loggedInUser?.teamId) return (
-    <div style={gv.page}>
-      <Navbar />
-      <div style={gv.emptyState}>
-        <ShieldCheck size={48} color="#333" />
-        <p style={gv.emptyTitle}>NO TEAM ASSIGNED</p>
-        <p style={gv.emptySub}>You do not have a team yet.</p>
-      </div>
+  if (!teamId) return (   // ← was loggedInUser?.teamId, ensures team check is based on what in the db instead of localStorage
+  <div style={gv.page}>
+    <Navbar />
+    <div style={gv.emptyState}>
+      <ShieldCheck size={48} color="#333" />
+      <p style={gv.emptyTitle}>NO TEAM ASSIGNED</p>
+      <p style={gv.emptySub}>You do not have a team yet.</p>
     </div>
-  );
+  </div>
+);
 
   const stats = buildTeamStats(players);
 
