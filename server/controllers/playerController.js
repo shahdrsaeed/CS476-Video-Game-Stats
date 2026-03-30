@@ -82,6 +82,10 @@ const getPlayerStats = async (req, res) => { // modified function to get necessa
     const killsPerRound = calculateKillsPerRound(player);   // ← add
     const damagePerRound = calculateDamagePerRound(player); // ← add
 
+    const topAgents = calculateTopAgents(player);
+    const topMaps = calculateTopMaps(player);
+    const topWeapons = calculateTopWeapons(player);
+
     // Merge computed stats into the player object
     const playerObj = player.toObject();
     delete playerObj.password;
@@ -93,7 +97,10 @@ const getPlayerStats = async (req, res) => { // modified function to get necessa
       ddDeltaPerRound,
       acs,
       killsPerRound,   // ← add
-      damagePerRound  // ← add
+      damagePerRound,  // ← add
+      topAgents,
+      topMaps,
+      topWeapons
     });
 
   } catch (error) {
