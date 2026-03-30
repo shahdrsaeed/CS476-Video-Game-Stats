@@ -557,7 +557,7 @@ const adapted = {
               </tr>
             </thead>
             <tbody>
-              {player.recentMatches.map((m, i) => (
+              {player.recentMatches.slice(0, 20).map((m, i) => (
                 <tr key={i} style={styles.matchRow}>
                   <td style={styles.matchTd}>{m.date}</td>
                   <td style={{ ...styles.matchTd, color: '#fff', fontWeight: 700 }}>{m.map}</td>
